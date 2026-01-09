@@ -75,7 +75,7 @@ class WeatherService extends ChangeNotifier {
 
   void _updateTime() {
     // Advance time (full cycle in 5 minutes = 300 seconds)
-    _timeOfDay += 1.0 / 300.0;
+    _timeOfDay += 1.0 / 1500.0;
     if (_timeOfDay >= 1.0) {
       _timeOfDay = 0.0;
     }
