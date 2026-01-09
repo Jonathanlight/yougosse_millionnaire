@@ -1,0 +1,78 @@
+{
+  "app": {
+    "name": "Yougosse Millionnaire"
+  },
+  "hud": {
+    "placementHint": "Touchez pour placer le bâtiment",
+    "revenuePerMin": "+{amount}€/min",
+    "collected": "Collecté {amount}€!"
+  },
+  "buildMenu": {
+    "title": "Construire",
+    "unlockHint": "Débloquez plus de bâtiments en montant de niveau !",
+    "cost": "{amount}€",
+    "revenue": "+{amount}€/m"
+  },
+  "buildingInfo": {
+    "tiles": "{width}x{height} cases",
+    "revenue": "Revenus",
+    "population": "Population",
+    "happiness": "Bonheur",
+    "placed": "Placé",
+    "noRevenue": "Aucun",
+    "readyToCollect": "Prêt à collecter",
+    "collect": "Collecter",
+    "demolish": "Démolir",
+    "demolishTitle": "Démolir le bâtiment ?",
+    "demolishMessage": "Êtes-vous sûr de vouloir démolir ce {building} ? Vous ne serez pas remboursé.",
+    "cancel": "Annuler",
+    "timeAgo": {
+      "days": "il y a {count}j",
+      "hours": "il y a {count}h",
+      "minutes": "il y a {count}m",
+      "justNow": "À l'instant"
+    }
+  },
+  "settings": {
+    "title": "Paramètres",
+    "statistics": "Statistiques",
+    "totalEarned": "Total gagné",
+    "buildingsPlaced": "Bâtiments placés",
+    "currentLevel": "Niveau actuel",
+    "population": "Population",
+    "cityOverview": "Aperçu de la ville",
+    "citySize": "Taille de la ville",
+    "totalBuildings": "Total bâtiments",
+    "revenuePerMin": "Revenus/min",
+    "happiness": "Bonheur",
+    "actions": "Actions",
+    "save": "Sauvegarder",
+    "saved": "Partie sauvegardée !",
+    "newGame": "Nouvelle partie",
+    "newGameTitle": "Nouvelle partie ?",
+    "newGameMessage": "Cela supprimera toute votre progression. Cette action est irréversible !",
+    "cancel": "Annuler",
+    "reset": "Réinitialiser"
+  },
+  "offlineEarnings": {
+    "title": "Gains hors-ligne",
+    "message": "Pendant votre absence, votre ville a gagné :"
+  },
+  "buildings": {
+    "house": "Maison",
+    "apartment": "Immeuble",
+    "shop": "Commerce",
+    "factory": "Usine",
+    "park": "Parc",
+    "townHall": "Mairie",
+    "flower": "Fleurs",
+    "road": "Route"
+  },
+  "categories": {
+    "residential": "Résidentiel",
+    "commercial": "Commercial",
+    "industrial": "Industriel",
+    "decoration": "Décoration",
+    "infrastructure": "Infrastructure"
+  }
+}

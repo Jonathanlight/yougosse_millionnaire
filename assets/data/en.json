@@ -1,0 +1,78 @@
+{
+  "app": {
+    "name": "Yougosse Millionnaire"
+  },
+  "hud": {
+    "placementHint": "Tap to place building",
+    "revenuePerMin": "+{amount}€/min",
+    "collected": "Collected {amount}€!"
+  },
+  "buildMenu": {
+    "title": "Build",
+    "unlockHint": "Unlock more buildings by leveling up!",
+    "cost": "{amount}€",
+    "revenue": "+{amount}€/m"
+  },
+  "buildingInfo": {
+    "tiles": "{width}x{height} tiles",
+    "revenue": "Revenue",
+    "population": "Population",
+    "happiness": "Happiness",
+    "placed": "Placed",
+    "noRevenue": "None",
+    "readyToCollect": "Ready to collect",
+    "collect": "Collect",
+    "demolish": "Demolish",
+    "demolishTitle": "Demolish Building?",
+    "demolishMessage": "Are you sure you want to demolish this {building}? You will not get a refund.",
+    "cancel": "Cancel",
+    "timeAgo": {
+      "days": "{count}d ago",
+      "hours": "{count}h ago",
+      "minutes": "{count}m ago",
+      "justNow": "Just now"
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "statistics": "Statistics",
+    "totalEarned": "Total Earned",
+    "buildingsPlaced": "Buildings Placed",
+    "currentLevel": "Current Level",
+    "population": "Population",
+    "cityOverview": "City Overview",
+    "citySize": "City Size",
+    "totalBuildings": "Total Buildings",
+    "revenuePerMin": "Revenue/min",
+    "happiness": "Happiness",
+    "actions": "Actions",
+    "save": "Save Game",
+    "saved": "Game saved!",
+    "newGame": "New Game",
+    "newGameTitle": "Start New Game?",
+    "newGameMessage": "This will delete all your progress and start fresh. This cannot be undone!",
+    "cancel": "Cancel",
+    "reset": "Reset"
+  },
+  "offlineEarnings": {
+    "title": "Offline Earnings",
+    "message": "While you were away, your city earned:"
+  },
+  "buildings": {
+    "house": "House",
+    "apartment": "Apartment",
+    "shop": "Shop",
+    "factory": "Factory",
+    "park": "Park",
+    "townHall": "Town Hall",
+    "flower": "Flowers",
+    "road": "Road"
+  },
+  "categories": {
+    "residential": "Residential",
+    "commercial": "Commercial",
+    "industrial": "Industrial",
+    "decoration": "Decoration",
+    "infrastructure": "Infrastructure"
+  }
+}
