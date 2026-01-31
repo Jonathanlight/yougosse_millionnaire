@@ -119,8 +119,8 @@ class BuildingInfoOverlay extends StatelessWidget {
                   _StatRow(
                     icon: Icons.euro,
                     label: 'Revenus',
-                    value: config.revenuePerMinute > 0
-                        ? '${config.revenuePerMinute}€/min'
+                    value: config.hasRevenue
+                        ? '${config.revenuePerCycle}€ / ${_formatCycleDuration(config.revenueCycleMinutes)}'
                         : 'Aucun',
                     valueColor: Colors.green,
                   ),
@@ -291,6 +291,18 @@ class BuildingInfoOverlay extends StatelessWidget {
       case BuildingCategory.infrastructure:
         return Icons.route;
     }
+  }
+
+  String _formatCycleDuration(int minutes) {
+    if (minutes >= 60) {
+      final hours = minutes ~/ 60;
+      final remainingMinutes = minutes % 60;
+      if (remainingMinutes == 0) {
+        return '${hours}h';
+      }
+      return '${hours}h${remainingMinutes}m';
+    }
+    return '${minutes}min';
   }
 
   String _formatDate(DateTime date) {

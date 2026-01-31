@@ -22,11 +22,18 @@ class BuildingComponent extends PositionComponent
   double _constructionPulse = 0;
   double _timerAngle = 0;
 
-  // Drag state
+  // Long-press and drag state
   bool _isDragging = false;
+  bool _isLongPressing = false;
+  bool _longPressActivated = false;
+  double _longPressTimer = 0;
+  double _longPressHaloPulse = 0;
   Vector2? _dragStartPosition;
   int _originalGridX = 0;
   int _originalGridY = 0;
+  bool _isValidPlacement = true;
+
+  static const double longPressDuration = 0.8; // 800ms
 
   // Static cache for building images
   static final Map<String, ui.Image> _imageCache = {};
@@ -177,15 +184,50 @@ class BuildingComponent extends PositionComponent
 
     // Update timer animation
     _timerAngle += dt * 2;
+
+    // Update long press timer
+    if (_isLongPressing && !_longPressActivated) {
+      _longPressTimer += dt;
+      _longPressHaloPulse += dt * 6; // Fast pulse during long press
+
+      if (_longPressTimer >= longPressDuration) {
+        // Long press completed - activate move mode
+        _longPressActivated = true;
+        _activateMoveMode();
+      }
+    }
+
+    // Update halo pulse when dragging
+    if (_isDragging) {
+      _longPressHaloPulse += dt * 4;
+    }
+  }
+
+  void _activateMoveMode() {
+    _isDragging = true;
+    _dragStartPosition = position.clone();
+    _originalGridX = model.gridX;
+    _originalGridY = model.gridY;
+
+    // Bring to front while dragging
+    priority = 10000;
+
+    // Haptic feedback
+    HapticFeedback.mediumImpact();
   }
 
   @override
   void render(Canvas canvas) {
     super.render(canvas);
 
+    // Draw long press halo indicator
+    if (_isLongPressing && !_longPressActivated) {
+      _renderLongPressHalo(canvas);
+    }
+
     // Draw validity indicator while dragging
     if (_isDragging) {
-      _renderDragIndicator(canvas);
+      _renderMoveIndicator(canvas);
     }
 
     if (model.isUnderConstruction) {
@@ -193,7 +235,7 @@ class BuildingComponent extends PositionComponent
     } else {
       _renderBuilding(canvas);
       // Render timer for revenue collection
-      if (config.revenuePerMinute > 0) {
+      if (config.hasRevenue) {
         _renderTimer(canvas);
       }
     }
@@ -203,7 +245,69 @@ class BuildingComponent extends PositionComponent
     }
   }
 
-  void _renderDragIndicator(Canvas canvas) {
+  void _renderLongPressHalo(Canvas canvas) {
+    // Calculate progress (0.0 to 1.0)
+    final progress = (_longPressTimer / longPressDuration).clamp(0.0, 1.0);
+
+    // Pulsing halo effect
+    final pulseAlpha = 0.3 + 0.3 * math.sin(_longPressHaloPulse);
+    final haloColor = AppColors.movePulseHalo.withValues(alpha: pulseAlpha);
+
+    // Draw expanding halo
+    final haloExpand = 10 + progress * 15;
+    final haloPaint = Paint()
+      ..color = haloColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 4 + progress * 4;
+
+    canvas.drawRect(
+      Rect.fromLTWH(-haloExpand, -haloExpand, size.x + haloExpand * 2, size.y + haloExpand * 2),
+      haloPaint,
+    );
+
+    // Draw progress arc at the corner
+    final progressArcPaint = Paint()
+      ..color = Colors.cyan
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3
+      ..strokeCap = StrokeCap.round;
+
+    final arcRect = Rect.fromCenter(
+      center: Offset(size.x / 2, -15),
+      width: 24,
+      height: 24,
+    );
+
+    // Background track
+    final trackPaint = Paint()
+      ..color = Colors.grey.shade800
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3;
+    canvas.drawArc(arcRect, 0, 2 * math.pi, false, trackPaint);
+
+    // Progress arc
+    canvas.drawArc(arcRect, -math.pi / 2, progress * 2 * math.pi, false, progressArcPaint);
+
+    // "Hold" text
+    final textPainter = TextPainter(
+      text: const TextSpan(
+        text: 'Maintenir...',
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    textPainter.layout();
+    textPainter.paint(
+      canvas,
+      Offset(size.x / 2 - textPainter.width / 2, -40),
+    );
+  }
+
+  void _renderMoveIndicator(Canvas canvas) {
     // Calculate current grid position
     final centerX = position.x + size.x / 2;
     final centerY = position.y + size.y / 2;
@@ -212,17 +316,21 @@ class BuildingComponent extends PositionComponent
 
     // Check if position is valid
     final canMove = game.gameState.city.canMoveBuilding(model.id, newGridX, newGridY);
+    _isValidPlacement = canMove;
+
+    // Animated pulse for visual feedback
+    final pulseAlpha = 0.2 + 0.15 * math.sin(_longPressHaloPulse);
 
     // Draw semi-transparent overlay
-    final color = canMove
-        ? Colors.green.withValues(alpha: 0.3)
-        : Colors.red.withValues(alpha: 0.3);
-    final borderColor = canMove ? Colors.green : Colors.red;
+    final bgColor = canMove
+        ? AppColors.moveValidBg.withValues(alpha: pulseAlpha + 0.2)
+        : AppColors.moveInvalidBg.withValues(alpha: pulseAlpha + 0.2);
+    final borderColor = canMove ? AppColors.moveValidBorder : AppColors.moveInvalidBorder;
 
-    final paint = Paint()..color = color;
+    final paint = Paint()..color = bgColor;
     canvas.drawRect(Rect.fromLTWH(0, 0, size.x, size.y), paint);
 
-    // Draw border
+    // Draw animated border
     final borderPaint = Paint()
       ..color = borderColor
       ..style = PaintingStyle.stroke
@@ -305,14 +413,13 @@ class BuildingComponent extends PositionComponent
 
   void _renderTimer(Canvas canvas) {
     if (model.isUnderConstruction) return;
+    if (!config.hasRevenue) return;
 
-    // Calculate time since last collection
-    final secondsSinceCollection =
-        DateTime.now().difference(model.lastCollectedAt).inSeconds;
-    final progress = (secondsSinceCollection / GameConstants.revenueIntervalSeconds)
-        .clamp(0.0, 1.0);
+    // Use cycle-based progress
+    final progress = model.cycleProgress;
+    final timeRemaining = model.timeUntilNextRevenue;
 
-    if (progress >= 1.0) return; // Already ready to collect
+    if (model.isCycleComplete) return; // Already ready to collect
 
     // Draw circular timer - MAXIMUM SIZE for visibility
     final centerX = size.x / 2;
@@ -372,55 +479,74 @@ class BuildingComponent extends PositionComponent
       progressPaint,
     );
 
-    // Time remaining text - VERY large and clear
-    final remainingSeconds = GameConstants.revenueIntervalSeconds - secondsSinceCollection;
-    if (remainingSeconds > 0) {
-      final textPainter = TextPainter(
-        text: TextSpan(
-          text: '$remainingSeconds',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-            shadows: [
-              Shadow(
-                color: progressColor,
-                blurRadius: 8,
-              ),
-              const Shadow(
-                color: Colors.black,
-                blurRadius: 2,
-                offset: Offset(1, 1),
-              ),
-            ],
-          ),
-        ),
-        textDirection: TextDirection.ltr,
-      );
-      textPainter.layout();
-      textPainter.paint(
-        canvas,
-        Offset(centerX - textPainter.width / 2, centerY - textPainter.height / 2),
-      );
+    // Format remaining time
+    final totalSeconds = timeRemaining.inSeconds;
+    String timeText;
+    String unitLabel;
 
-      // "s" label below
-      final labelPainter = TextPainter(
-        text: const TextSpan(
-          text: 'sec',
-          style: TextStyle(
-            color: Colors.white70,
-            fontSize: 8,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        textDirection: TextDirection.ltr,
-      );
-      labelPainter.layout();
-      labelPainter.paint(
-        canvas,
-        Offset(centerX - labelPainter.width / 2, centerY + 8),
-      );
+    if (totalSeconds >= 3600) {
+      // Show hours and minutes
+      final hours = totalSeconds ~/ 3600;
+      final minutes = (totalSeconds % 3600) ~/ 60;
+      timeText = '$hours:${minutes.toString().padLeft(2, '0')}';
+      unitLabel = 'h:m';
+    } else if (totalSeconds >= 60) {
+      // Show minutes and seconds
+      final minutes = totalSeconds ~/ 60;
+      final seconds = totalSeconds % 60;
+      timeText = '$minutes:${seconds.toString().padLeft(2, '0')}';
+      unitLabel = 'm:s';
+    } else {
+      // Show seconds only
+      timeText = '$totalSeconds';
+      unitLabel = 'sec';
     }
+
+    final textPainter = TextPainter(
+      text: TextSpan(
+        text: timeText,
+        style: TextStyle(
+          color: Colors.white,
+          fontSize: totalSeconds >= 3600 ? 14 : 18,
+          fontWeight: FontWeight.bold,
+          shadows: [
+            Shadow(
+              color: progressColor,
+              blurRadius: 8,
+            ),
+            const Shadow(
+              color: Colors.black,
+              blurRadius: 2,
+              offset: Offset(1, 1),
+            ),
+          ],
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    textPainter.layout();
+    textPainter.paint(
+      canvas,
+      Offset(centerX - textPainter.width / 2, centerY - textPainter.height / 2),
+    );
+
+    // Unit label below
+    final labelPainter = TextPainter(
+      text: TextSpan(
+        text: unitLabel,
+        style: const TextStyle(
+          color: Colors.white70,
+          fontSize: 8,
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    labelPainter.layout();
+    labelPainter.paint(
+      canvas,
+      Offset(centerX - labelPainter.width / 2, centerY + 8),
+    );
   }
 
   void _renderHouse(Canvas canvas, Rect rect) {
@@ -842,22 +968,47 @@ class BuildingComponent extends PositionComponent
       return false;
     }
 
-    if (model.hasRevenueToCollect) {
-      final revenue = game.gameState.collectRevenue(model.id);
-      if (revenue > 0) {
-        _spawnConfettiEffect(revenue);
-        // Play cash register sound
-        audioService.playCashRegister();
+    // Start long press timer for move mode
+    _isLongPressing = true;
+    _longPressTimer = 0;
+    _longPressActivated = false;
+
+    return true;
+  }
+
+  @override
+  bool onTapUp(TapUpEvent event) {
+    // If long press wasn't activated, this is a normal tap
+    if (_isLongPressing && !_longPressActivated) {
+      _isLongPressing = false;
+      _longPressTimer = 0;
+
+      // Handle normal tap - collect revenue or show info
+      if (model.hasRevenueToCollect) {
+        final revenue = game.gameState.collectRevenue(model.id);
+        if (revenue > 0) {
+          _spawnConfettiEffect(revenue);
+          audioService.playCashRegister();
+        }
+      } else {
+        game.showBuildingInfo(model);
       }
-    } else {
-      // Show building info
-      game.showBuildingInfo(model);
     }
 
     return true;
   }
 
-  // ==================== DRAG TO MOVE ====================
+  @override
+  bool onTapCancel(TapCancelEvent event) {
+    // Cancel long press if finger lifted too early
+    if (_isLongPressing && !_longPressActivated) {
+      _isLongPressing = false;
+      _longPressTimer = 0;
+    }
+    return true;
+  }
+
+  // ==================== LONG-PRESS TO MOVE ====================
 
   @override
   void onDragStart(DragStartEvent event) {
@@ -867,21 +1018,20 @@ class BuildingComponent extends PositionComponent
       return;
     }
 
-    // Start dragging
-    _isDragging = true;
-    _dragStartPosition = position.clone();
-    _originalGridX = model.gridX;
-    _originalGridY = model.gridY;
-
-    // Bring to front while dragging
-    priority = 10000;
+    // Start long press timer (dragging also triggers long press)
+    if (!_isDragging) {
+      _isLongPressing = true;
+      _longPressTimer = 0;
+      _longPressActivated = false;
+    }
   }
 
   @override
   void onDragUpdate(DragUpdateEvent event) {
     super.onDragUpdate(event);
 
-    if (!_isDragging) return;
+    // Only move if long press was activated
+    if (!_isDragging || !_longPressActivated) return;
 
     // Move the building visually following the drag
     // Account for camera zoom
@@ -893,9 +1043,18 @@ class BuildingComponent extends PositionComponent
   void onDragEnd(DragEndEvent event) {
     super.onDragEnd(event);
 
-    if (!_isDragging) return;
+    // Reset long press state
+    _isLongPressing = false;
+    _longPressTimer = 0;
+
+    // If long press wasn't activated, do nothing (was just a touch)
+    if (!_longPressActivated) {
+      _isDragging = false;
+      return;
+    }
 
     _isDragging = false;
+    _longPressActivated = false;
 
     // Calculate the grid position where we dropped
     final centerX = position.x + size.x / 2;
@@ -910,15 +1069,46 @@ class BuildingComponent extends PositionComponent
       // Move the building in the model
       game.gameState.city.moveBuilding(model.id, newGridX, newGridY);
 
-      // Snap to grid
-      position = Vector2(newGridX * cellSize, newGridY * cellSize);
+      // Snap to grid with drop animation
+      final targetPosition = Vector2(newGridX * cellSize, newGridY * cellSize);
+      position = targetPosition;
+
+      // Drop animation (scale bounce)
+      add(
+        ScaleEffect.to(
+          Vector2.all(1.1),
+          EffectController(duration: 0.1),
+        )..onComplete = () {
+          add(
+            ScaleEffect.to(
+              Vector2.all(1.0),
+              EffectController(duration: 0.1, curve: Curves.easeOut),
+            ),
+          );
+        },
+      );
 
       // Update priority for z-ordering
       priority = newGridY + newGridX;
+
+      // Success haptic
+      HapticFeedback.lightImpact();
     } else {
-      // Revert to original position with animation
-      position = Vector2(_originalGridX * cellSize, _originalGridY * cellSize);
-      priority = _originalGridY + _originalGridX;
+      // Revert to original position with smooth animation
+      final originalPosition = Vector2(_originalGridX * cellSize, _originalGridY * cellSize);
+
+      // Animate back to original position
+      add(
+        MoveEffect.to(
+          originalPosition,
+          EffectController(duration: 0.3, curve: Curves.easeOutBack),
+        )..onComplete = () {
+          priority = _originalGridY + _originalGridX;
+        },
+      );
+
+      // Error haptic
+      HapticFeedback.heavyImpact();
     }
   }
 
@@ -926,13 +1116,24 @@ class BuildingComponent extends PositionComponent
   void onDragCancel(DragCancelEvent event) {
     super.onDragCancel(event);
 
+    // Reset long press state
+    _isLongPressing = false;
+    _longPressTimer = 0;
+
     if (!_isDragging) return;
 
     _isDragging = false;
+    _longPressActivated = false;
 
-    // Revert to original position
-    position = Vector2(_originalGridX * cellSize, _originalGridY * cellSize);
-    priority = _originalGridY + _originalGridX;
+    // Revert to original position with animation
+    add(
+      MoveEffect.to(
+        Vector2(_originalGridX * cellSize, _originalGridY * cellSize),
+        EffectController(duration: 0.3, curve: Curves.easeOutBack),
+      )..onComplete = () {
+        priority = _originalGridY + _originalGridX;
+      },
+    );
   }
 
   void _spawnConfettiEffect(int amount) {

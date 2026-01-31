@@ -13,8 +13,10 @@ import 'services/save_service.dart';
 import 'services/weather_service.dart';
 import 'ui/overlays/build_menu.dart';
 import 'ui/overlays/building_info.dart';
+import 'ui/overlays/daily_greeting_dialog.dart';
 import 'ui/overlays/game_rules_overlay.dart';
 import 'ui/overlays/hud_overlay.dart';
+import 'ui/overlays/monthly_objectives_overlay.dart';
 import 'ui/overlays/objectives_overlay.dart';
 import 'ui/overlays/settings_overlay.dart';
 import 'ui/overlays/weather_overlay.dart';
@@ -321,6 +323,8 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   bool _showSettings = false;
   bool _showObjectives = false;
   bool _showGameRules = false;
+  bool _showDailyGreeting = false;
+  bool _showMonthlyObjectives = false;
   BuildingModel? _selectedBuilding;
 
   @override
@@ -402,6 +406,21 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     setState(() {
       _isLoading = false;
     });
+
+    // Check if we should show daily greeting (after other dialogs)
+    _checkDailyGreeting();
+  }
+
+  Future<void> _checkDailyGreeting() async {
+    // Wait a bit for other dialogs to finish
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    // Always show NPC button on app launch
+    if (mounted) {
+      setState(() {
+        _showDailyGreeting = true;
+      });
+    }
   }
 
   void _updateObjectivesProgress() {
@@ -730,9 +749,22 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
             ),
           ),
 
-          // Game rules button (below objectives)
+          // Monthly objectives button (below objectives)
           Positioned(
-            top: 220,
+            top: 265,
+            right: 16,
+            child: _MonthlyObjectivesButton(
+              onTap: () {
+                setState(() {
+                  _showMonthlyObjectives = true;
+                });
+              },
+            ),
+          ),
+
+          // Game rules button (below monthly objectives)
+          Positioned(
+            top: 310,
             right: 16,
             child: GameRulesButton(
               onTap: () {
@@ -805,7 +837,75 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
               onSave: _saveGame,
               onReset: _resetGame,
             ),
+
+          // Monthly objectives overlay
+          if (_showMonthlyObjectives)
+            MonthlyObjectivesOverlay(
+              gameState: _gameState,
+              onClose: () {
+                setState(() {
+                  _showMonthlyObjectives = false;
+                });
+              },
+              onRewardClaimed: (money, xp) {
+                _gameState.addMoney(money);
+                _gameState.addXp(xp);
+              },
+            ),
+
+          // NPC message button (animated icon, auto-hides after 5s)
+          Positioned(
+            bottom: 150,
+            right: 16,
+            child: NpcMessageButton(
+              lastDailyRevenue: _gameState.player.lastDailyRevenue,
+              population: _gameState.population,
+              onDismiss: () {
+                setState(() {
+                  _showDailyGreeting = false;
+                });
+              },
+            ),
+          ),
         ],
+      ),
+    );
+  }
+}
+
+/// Button to open monthly objectives overlay
+class _MonthlyObjectivesButton extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _MonthlyObjectivesButton({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: Colors.purple.withValues(alpha: 0.8),
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.3),
+            width: 2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.purple.withValues(alpha: 0.4),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: const Icon(
+          Icons.calendar_month,
+          color: Colors.white,
+          size: 22,
+        ),
       ),
     );
   }

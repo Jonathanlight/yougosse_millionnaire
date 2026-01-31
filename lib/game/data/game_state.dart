@@ -46,7 +46,8 @@ class GameState extends ChangeNotifier {
   int get level => _player.level;
   int get population => _city.totalPopulation;
   double get happiness => _city.happiness;
-  int get revenuePerMinute => _city.totalRevenuePerMinute;
+  double get revenuePerMinute => _city.totalRevenuePerMinute;
+  int get revenuePerCycle => _city.totalRevenuePerCycle;
 
   /// Set city name
   void setCityName(String name) {
@@ -213,6 +214,12 @@ class GameState extends ChangeNotifier {
   /// Add money directly (for offline earnings, etc.)
   void addMoney(int amount) {
     _player.addMoney(amount);
+    notifyListeners();
+  }
+
+  /// Add XP directly (for objective rewards, etc.)
+  void addXp(int amount) {
+    _player.addXp(amount);
     notifyListeners();
   }
 

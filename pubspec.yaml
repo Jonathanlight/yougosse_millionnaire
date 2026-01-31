@@ -25,6 +25,7 @@ dependencies:
   uuid: ^4.5.1
   intl: ^0.20.0
   collection: ^1.19.0
+  shared_preferences: ^2.2.2
 
 dev_dependencies:
   flutter_test:
@@ -51,7 +52,8 @@ flutter:
     - assets/building/maison/
     - assets/building/immeuble/
     - assets/building/commerce/
-    - assets/building/activite/
+    - assets/building/activity/
     - assets/building/decoration/
     - assets/building/monument/
     - assets/building/route/
+    - assets/person/

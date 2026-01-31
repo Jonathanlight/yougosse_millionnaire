@@ -1,12 +1,13 @@
 import 'package:flame_audio/flame_audio.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/constants.dart';
 
 /// Service for managing game audio
 class AudioService {
   bool _isMusicEnabled = true;
   bool _isSfxEnabled = true;
-  double _musicVolume = GameConstants.musicVolume;
-  double _sfxVolume = GameConstants.sfxVolume;
+  double _musicVolume = GameConstants.defaultMusicVolume;
+  double _sfxVolume = GameConstants.defaultSfxVolume;
   bool _isInitialized = false;
   bool _isMusicPlaying = false;
 
@@ -20,6 +21,9 @@ class AudioService {
     if (_isInitialized) return;
 
     try {
+      // Load saved volume settings
+      await _loadVolumeSettings();
+
       // Preload audio files
       await FlameAudio.audioCache.loadAll([
         AssetPaths.backgroundMusic,
@@ -35,6 +39,23 @@ class AudioService {
     } catch (e) {
       print('Audio initialization failed: $e');
       _isInitialized = true; // Mark as initialized to prevent retry loops
+    }
+  }
+
+  /// Load volume settings from SharedPreferences
+  Future<void> _loadVolumeSettings() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _musicVolume = prefs.getDouble('music_volume') ?? GameConstants.defaultMusicVolume;
+      _sfxVolume = prefs.getDouble('sfx_volume') ?? GameConstants.defaultSfxVolume;
+      final isMuted = prefs.getBool('is_muted') ?? false;
+      _isMusicEnabled = !isMuted;
+      _isSfxEnabled = !isMuted;
+    } catch (e) {
+      // SharedPreferences may fail on some platforms - use defaults
+      print('Failed to load volume settings (using defaults): $e');
+      _musicVolume = GameConstants.defaultMusicVolume;
+      _sfxVolume = GameConstants.defaultSfxVolume;
     }
   }
 

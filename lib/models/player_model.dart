@@ -13,6 +13,11 @@ class PlayerModel {
   int creditAmount;
   DateTime? lastCreditPaymentDate;
 
+  // Daily revenue tracking
+  int dailyRevenueTracker;
+  int lastDailyRevenue;
+  DateTime lastRevenueResetDate;
+
   PlayerModel({
     this.money = GameConstants.startingMoney,
     this.xp = 0,
@@ -22,7 +27,11 @@ class PlayerModel {
     this.hasTakenCredit = false,
     this.creditAmount = 0,
     this.lastCreditPaymentDate,
-  }) : lastSessionTime = lastSessionTime ?? DateTime.now();
+    this.dailyRevenueTracker = 0,
+    this.lastDailyRevenue = 0,
+    DateTime? lastRevenueResetDate,
+  }) : lastSessionTime = lastSessionTime ?? DateTime.now(),
+       lastRevenueResetDate = lastRevenueResetDate ?? DateTime.now();
 
   /// Calculate player level from XP
   int get level {
@@ -45,7 +54,37 @@ class PlayerModel {
     money += amount;
     if (amount > 0) {
       totalMoneyEarned += amount;
+      _addToDailyRevenue(amount);
     }
+  }
+
+  /// Add to daily revenue tracker
+  void _addToDailyRevenue(int amount) {
+    _checkAndResetDaily();
+    dailyRevenueTracker += amount;
+  }
+
+  /// Check if we need to reset the daily tracker (new day)
+  void _checkAndResetDaily() {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final lastReset = DateTime(
+      lastRevenueResetDate.year,
+      lastRevenueResetDate.month,
+      lastRevenueResetDate.day,
+    );
+
+    if (today.isAfter(lastReset)) {
+      // New day - transfer to lastDailyRevenue and reset
+      lastDailyRevenue = dailyRevenueTracker;
+      dailyRevenueTracker = 0;
+      lastRevenueResetDate = now;
+    }
+  }
+
+  /// Force check daily reset (call on app start)
+  void checkDailyReset() {
+    _checkAndResetDaily();
   }
 
   /// Try to spend money, returns true if successful
@@ -73,12 +112,12 @@ class PlayerModel {
   }
 
   /// Calculate offline earnings
-  int calculateOfflineEarnings(int revenuePerMinute) {
+  int calculateOfflineEarnings(double revenuePerMinute) {
     final minutesOffline =
         DateTime.now().difference(lastSessionTime).inMinutes;
     // Cap offline earnings to 24 hours
     final cappedMinutes = minutesOffline.clamp(0, 24 * 60);
-    return cappedMinutes * revenuePerMinute;
+    return (cappedMinutes * revenuePerMinute).round();
   }
 
   /// Check if player can take a bank credit
@@ -148,6 +187,9 @@ class PlayerModel {
     bool? hasTakenCredit,
     int? creditAmount,
     DateTime? lastCreditPaymentDate,
+    int? dailyRevenueTracker,
+    int? lastDailyRevenue,
+    DateTime? lastRevenueResetDate,
   }) {
     return PlayerModel(
       money: money ?? this.money,
@@ -158,6 +200,9 @@ class PlayerModel {
       hasTakenCredit: hasTakenCredit ?? this.hasTakenCredit,
       creditAmount: creditAmount ?? this.creditAmount,
       lastCreditPaymentDate: lastCreditPaymentDate ?? this.lastCreditPaymentDate,
+      dailyRevenueTracker: dailyRevenueTracker ?? this.dailyRevenueTracker,
+      lastDailyRevenue: lastDailyRevenue ?? this.lastDailyRevenue,
+      lastRevenueResetDate: lastRevenueResetDate ?? this.lastRevenueResetDate,
     );
   }
 
@@ -172,12 +217,15 @@ class PlayerModel {
       'hasTakenCredit': hasTakenCredit,
       'creditAmount': creditAmount,
       'lastCreditPaymentDate': lastCreditPaymentDate?.toIso8601String(),
+      'dailyRevenueTracker': dailyRevenueTracker,
+      'lastDailyRevenue': lastDailyRevenue,
+      'lastRevenueResetDate': lastRevenueResetDate.toIso8601String(),
     };
   }
 
   /// Create from JSON
   factory PlayerModel.fromJson(Map<String, dynamic> json) {
-    return PlayerModel(
+    final player = PlayerModel(
       money: json['money'] as int? ?? GameConstants.startingMoney,
       xp: json['xp'] as int? ?? 0,
       totalMoneyEarned: json['totalMoneyEarned'] as int? ?? 0,
@@ -190,7 +238,16 @@ class PlayerModel {
       lastCreditPaymentDate: json['lastCreditPaymentDate'] != null
           ? DateTime.parse(json['lastCreditPaymentDate'] as String)
           : null,
+      dailyRevenueTracker: json['dailyRevenueTracker'] as int? ?? 0,
+      lastDailyRevenue: json['lastDailyRevenue'] as int? ?? 0,
+      lastRevenueResetDate: json['lastRevenueResetDate'] != null
+          ? DateTime.parse(json['lastRevenueResetDate'] as String)
+          : DateTime.now(),
     );
+
+    // Check for daily reset on load
+    player.checkDailyReset();
+    return player;
   }
 
   @override

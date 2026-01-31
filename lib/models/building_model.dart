@@ -54,19 +54,62 @@ class BuildingModel {
     return constructionEndTime!.difference(DateTime.now());
   }
 
-  /// Calculate uncollected revenue
+  /// Calculate uncollected revenue based on cycle system
   int calculatePendingRevenue() {
     if (isUnderConstruction) return 0;
-    if (config.revenuePerMinute == 0) return 0;
+    if (!config.hasRevenue) return 0;
 
     final minutesSinceLastCollection =
         DateTime.now().difference(lastCollectedAt).inMinutes;
-    return minutesSinceLastCollection * config.revenuePerMinute;
+
+    // Calculate how many complete cycles have passed
+    final completedCycles = minutesSinceLastCollection ~/ config.revenueCycleMinutes;
+    return completedCycles * config.revenuePerCycle;
+  }
+
+  /// Get progress through current cycle (0.0 to 1.0)
+  double get cycleProgress {
+    if (isUnderConstruction) return 0.0;
+    if (!config.hasRevenue) return 0.0;
+
+    final secondsSinceLastCollection =
+        DateTime.now().difference(lastCollectedAt).inSeconds;
+    final cycleSeconds = config.revenueCycleMinutes * 60;
+
+    // Get progress within current cycle (after any complete cycles)
+    final secondsInCurrentCycle = secondsSinceLastCollection % cycleSeconds;
+    return (secondsInCurrentCycle / cycleSeconds).clamp(0.0, 1.0);
+  }
+
+  /// Get remaining time until next revenue is ready
+  Duration get timeUntilNextRevenue {
+    if (isUnderConstruction) return Duration.zero;
+    if (!config.hasRevenue) return Duration.zero;
+
+    final secondsSinceLastCollection =
+        DateTime.now().difference(lastCollectedAt).inSeconds;
+    final cycleSeconds = config.revenueCycleMinutes * 60;
+
+    // Calculate remaining time in current cycle
+    final secondsInCurrentCycle = secondsSinceLastCollection % cycleSeconds;
+    final remainingSeconds = cycleSeconds - secondsInCurrentCycle;
+
+    return Duration(seconds: remainingSeconds);
+  }
+
+  /// Check if a full cycle has completed (revenue ready)
+  bool get isCycleComplete {
+    if (isUnderConstruction) return false;
+    if (!config.hasRevenue) return false;
+
+    final minutesSinceLastCollection =
+        DateTime.now().difference(lastCollectedAt).inMinutes;
+    return minutesSinceLastCollection >= config.revenueCycleMinutes;
   }
 
   /// Check if there's revenue to collect
   bool get hasRevenueToCollect {
-    return calculatePendingRevenue() > 0 || pendingRevenue > 0;
+    return isCycleComplete || pendingRevenue > 0;
   }
 
   /// Collect revenue and return amount

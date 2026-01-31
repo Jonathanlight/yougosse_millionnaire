@@ -67,10 +67,13 @@ class TimeSystem {
     return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
   }
 
-  /// Calculate time until next revenue cycle
+  /// Calculate time until next revenue cycle (deprecated - revenue is now per-building cycle)
+  @Deprecated('Use building-specific cycle tracking instead')
   Duration get timeUntilNextRevenue {
-    final elapsed = _gameTime % GameConstants.revenueIntervalSeconds;
-    final remaining = GameConstants.revenueIntervalSeconds - elapsed;
+    // Default to 30 minutes (1800 seconds) as minimum cycle duration
+    const defaultCycleSeconds = 1800;
+    final elapsed = _gameTime % defaultCycleSeconds;
+    final remaining = defaultCycleSeconds - elapsed;
     return Duration(seconds: remaining.round());
   }
 }

@@ -202,7 +202,7 @@ class _HudOverlayState extends State<HudOverlay> {
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  '+${widget.gameState.revenuePerMinute}€/min',
+                  '+${widget.gameState.revenuePerMinute.toStringAsFixed(1)}/min',
                   style: TextStyle(
                     color: Colors.green.shade400,
                     fontSize: 12,

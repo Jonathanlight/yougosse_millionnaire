@@ -216,6 +216,14 @@ class _BuildingCard extends StatelessWidget {
     required this.onTap,
   });
 
+  String _formatCycleDuration(int minutes) {
+    if (minutes >= 60) {
+      final hours = minutes ~/ 60;
+      return '${hours}h';
+    }
+    return '${minutes}m';
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -278,9 +286,9 @@ class _BuildingCard extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      if (config.revenuePerMinute > 0)
+                      if (config.hasRevenue)
                         Text(
-                          '+${config.revenuePerMinute}€/m',
+                          '+${config.revenuePerCycle}€/${_formatCycleDuration(config.revenueCycleMinutes)}',
                           style: TextStyle(
                             color: Colors.blue.shade300,
                             fontSize: 11,

@@ -130,11 +130,18 @@ class CityModel {
         .fold(0, (sum, b) => sum + b.config.population);
   }
 
-  /// Get total revenue per minute
-  int get totalRevenuePerMinute {
+  /// Get total revenue per minute (calculated from cycle data)
+  double get totalRevenuePerMinute {
     return buildings
-        .where((b) => !b.isUnderConstruction)
-        .fold(0, (sum, b) => sum + b.config.revenuePerMinute);
+        .where((b) => !b.isUnderConstruction && b.config.hasRevenue)
+        .fold(0.0, (sum, b) => sum + b.config.revenuePerMinute);
+  }
+
+  /// Get total revenue per cycle for display
+  int get totalRevenuePerCycle {
+    return buildings
+        .where((b) => !b.isUnderConstruction && b.config.hasRevenue)
+        .fold(0, (sum, b) => sum + b.config.revenuePerCycle);
   }
 
   /// Get happiness (0.0 to 1.0+)

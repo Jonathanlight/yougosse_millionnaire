@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../game/data/game_state.dart';
 import '../../utils/helpers.dart';
+import '../widgets/volume_settings_widget.dart';
 
 /// Settings overlay with game options and stats
 class SettingsOverlay extends StatelessWidget {
@@ -154,6 +155,20 @@ class SettingsOverlay extends StatelessWidget {
                               ),
                             ],
                           ),
+                          const SizedBox(height: 24),
+
+                          // Audio settings section
+                          const Text(
+                            'Audio',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          const VolumeSettingsWidget(),
+
                           const SizedBox(height: 24),
                           const Text(
                             'Actions',
