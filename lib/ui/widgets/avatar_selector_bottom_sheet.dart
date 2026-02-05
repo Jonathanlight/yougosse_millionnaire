@@ -45,8 +45,10 @@ class _AvatarSelectorBottomSheetState extends State<AvatarSelectorBottomSheet> {
       Navigator.of(context).pop();
       widget.onAvatarChanged?.call();
 
-      // Trigger celebration
-      celebrationService.celebrate(CelebrationType.avatarChanged);
+      // Trigger celebration after frame to avoid build conflicts
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        celebrationService.celebrate(CelebrationType.avatarChanged);
+      });
     } else {
       setState(() {
         _isSaving = false;

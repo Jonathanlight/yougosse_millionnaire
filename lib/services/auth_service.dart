@@ -46,6 +46,7 @@ class AuthService extends ChangeNotifier {
   static const String _localUserIdKey = 'local_user_id';
   static const String _localUserNameKey = 'local_user_name';
   static const String _authStateKey = 'auth_state';
+  static const String _cachedUserKey = 'cached_user_profile';
 
   // Firebase instances (lazy access)
   FirebaseAuth? _authInstance;
@@ -63,7 +64,9 @@ class AuthService extends ChangeNotifier {
   }
 
   GoogleSignIn get _googleSignIn {
-    _googleSignInInstance ??= GoogleSignIn();
+    _googleSignInInstance ??= GoogleSignIn(
+      serverClientId: '558527837591-mk7j0tc7clj9u4unlafplhrj501ilu2q.apps.googleusercontent.com',
+    );
     return _googleSignInInstance!;
   }
 
@@ -109,16 +112,42 @@ class AuthService extends ChangeNotifier {
   /// Firebase est-il disponible ?
   bool get isFirebaseAvailable => _firebaseAvailable;
 
-  /// Initialiser le service en mode invité local (pas d'appel Firebase)
+  /// Initialiser le service - restaure la session depuis le cache local
   /// C'est l'état par défaut au lancement de l'app
   Future<void> initializeAsGuest() async {
     if (_isInitialized) return;
 
-    debugPrint('[AuthService] Initialisation en mode invité local...');
+    debugPrint('[AuthService] Initialisation...');
 
     try {
-      // Charger ou créer l'ID utilisateur local
       final prefs = await SharedPreferences.getInstance();
+
+      // 1. Essayer de restaurer une session authentifiée depuis le cache
+      final cachedUserJson = prefs.getString(_cachedUserKey);
+      if (cachedUserJson != null) {
+        try {
+          final userMap = jsonDecode(cachedUserJson) as Map<String, dynamic>;
+          _currentUser = UserModel.fromJson(userMap);
+          _localUserId = _currentUser!.id;
+
+          // Restaurer l'état d'auth
+          if (_currentUser!.authProvider != 'local' &&
+              _currentUser!.authProvider != 'anonymous') {
+            _authState = AuthState.authenticated;
+            debugPrint('[AuthService] Session restaurée depuis cache: ${_currentUser!.displayName}');
+          } else {
+            _authState = AuthState.guestLocal;
+          }
+
+          _isInitialized = true;
+          notifyListeners();
+          return;
+        } catch (e) {
+          debugPrint('[AuthService] Erreur lecture cache: $e');
+        }
+      }
+
+      // 2. Sinon, créer un utilisateur local invité
       _localUserId = prefs.getString(_localUserIdKey);
 
       if (_localUserId == null) {
@@ -127,10 +156,8 @@ class AuthService extends ChangeNotifier {
         debugPrint('[AuthService] Nouvel ID local créé: $_localUserId');
       }
 
-      // Charger le nom local si existant
       final localName = prefs.getString(_localUserNameKey);
 
-      // Créer un UserModel local
       _currentUser = UserModel(
         id: _localUserId!,
         displayName: localName ?? 'Joueur',
@@ -147,8 +174,7 @@ class AuthService extends ChangeNotifier {
       debugPrint('[AuthService] Mode invité local initialisé - ID: $_localUserId');
       notifyListeners();
     } catch (e) {
-      debugPrint('[AuthService] Erreur init guest: $e');
-      // Même en cas d'erreur, on continue avec un ID temporaire
+      debugPrint('[AuthService] Erreur init: $e');
       _localUserId = const Uuid().v4();
       _authState = AuthState.guestLocal;
       _isInitialized = true;
@@ -156,7 +182,32 @@ class AuthService extends ChangeNotifier {
     }
   }
 
+  /// Sauvegarder le profil utilisateur dans le cache local
+  Future<void> _cacheUserProfile() async {
+    if (_currentUser == null) return;
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userJson = jsonEncode(_currentUser!.toJson());
+      await prefs.setString(_cachedUserKey, userJson);
+      debugPrint('[AuthService] Profil mis en cache');
+    } catch (e) {
+      debugPrint('[AuthService] Erreur cache profil: $e');
+    }
+  }
+
+  /// Effacer le cache utilisateur
+  Future<void> _clearUserCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_cachedUserKey);
+    } catch (e) {
+      debugPrint('[AuthService] Erreur clear cache: $e');
+    }
+  }
+
   /// Tenter de se connecter à Firebase (appelé en arrière-plan après le lancement)
+  /// Cette méthode ne bloque pas - elle synchronise en arrière-plan
   Future<void> tryConnectFirebase() async {
     try {
       debugPrint('[AuthService] Tentative connexion Firebase...');
@@ -168,17 +219,19 @@ class AuthService extends ChangeNotifier {
         _firebaseUser = currentUser;
         _firebaseAvailable = true;
 
-        // Charger le profil Firestore
-        await _loadUserProfile();
-
-        // Déterminer l'état
+        // Mettre à jour l'état si nécessaire
         if (currentUser.isAnonymous) {
-          _authState = AuthState.guestFirebase;
+          if (_authState != AuthState.authenticated) {
+            _authState = AuthState.guestFirebase;
+          }
         } else {
           _authState = AuthState.authenticated;
         }
 
         debugPrint('[AuthService] Utilisateur Firebase restauré: ${currentUser.uid}');
+
+        // Charger le profil Firestore en arrière-plan (non-bloquant)
+        _loadUserProfileInBackground();
       } else {
         _firebaseAvailable = true;
         debugPrint('[AuthService] Firebase disponible, pas d\'utilisateur connecté');
@@ -193,6 +246,17 @@ class AuthService extends ChangeNotifier {
       _firebaseAvailable = false;
       // On reste en mode local, pas de crash
     }
+  }
+
+  /// Charger le profil en arrière-plan sans bloquer
+  void _loadUserProfileInBackground() {
+    _loadUserProfile().then((_) {
+      // Mettre à jour le cache après chargement réussi
+      _cacheUserProfile();
+    }).catchError((e) {
+      debugPrint('[AuthService] Erreur chargement profil background: $e');
+      // On garde le profil en cache, pas de problème
+    });
   }
 
   /// Callback lors des changements d'etat d'auth Firebase
@@ -328,6 +392,7 @@ class AuthService extends ChangeNotifier {
         }
 
         _authState = AuthState.authenticated;
+        await _cacheUserProfile(); // Sauvegarder en cache local
         notifyListeners();
 
         debugPrint('[AuthService] Connexion Google réussie');
@@ -382,6 +447,7 @@ class AuthService extends ChangeNotifier {
         );
 
         _authState = AuthState.authenticated;
+        await _cacheUserProfile(); // Sauvegarder en cache local
         notifyListeners();
 
         return AuthResult.success(_currentUser);
@@ -424,6 +490,7 @@ class AuthService extends ChangeNotifier {
         }
 
         _authState = AuthState.authenticated;
+        await _cacheUserProfile(); // Sauvegarder en cache local
         notifyListeners();
 
         return AuthResult.success(_currentUser);
@@ -495,6 +562,7 @@ class AuthService extends ChangeNotifier {
         }
 
         _authState = AuthState.authenticated;
+        await _cacheUserProfile(); // Sauvegarder en cache local
         notifyListeners();
 
         return AuthResult.success(_currentUser);
@@ -719,6 +787,9 @@ class AuthService extends ChangeNotifier {
     }
 
     _firebaseUser = null;
+
+    // Effacer le cache utilisateur
+    await _clearUserCache();
 
     // Recréer un utilisateur local
     _currentUser = UserModel(

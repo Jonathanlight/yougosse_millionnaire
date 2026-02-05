@@ -21,7 +21,7 @@ class ShopOverlay extends StatefulWidget {
 }
 
 class _ShopOverlayState extends State<ShopOverlay>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late TabController _tabController;
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
@@ -703,7 +703,8 @@ class _GemOfferCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 4),
-                      Row(
+                      Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           Text(
                             '${offer.gems}',

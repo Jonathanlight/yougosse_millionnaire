@@ -58,6 +58,36 @@ class UserModel {
     };
   }
 
+  /// Convertir en JSON pour le cache local
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'email': email,
+      'displayName': displayName,
+      'photoUrl': photoUrl,
+      'createdAt': createdAt.toIso8601String(),
+      'lastLoginAt': lastLoginAt.toIso8601String(),
+      'totalGamesCreated': totalGamesCreated,
+      'authProvider': authProvider,
+      'isAnonymous': isAnonymous,
+    };
+  }
+
+  /// Créer depuis JSON (cache local)
+  factory UserModel.fromJson(Map<String, dynamic> json) {
+    return UserModel(
+      id: json['id'] as String,
+      email: json['email'] as String?,
+      displayName: json['displayName'] as String?,
+      photoUrl: json['photoUrl'] as String?,
+      createdAt: DateTime.parse(json['createdAt'] as String),
+      lastLoginAt: DateTime.parse(json['lastLoginAt'] as String),
+      totalGamesCreated: json['totalGamesCreated'] as int? ?? 0,
+      authProvider: json['authProvider'] as String? ?? 'local',
+      isAnonymous: json['isAnonymous'] as bool? ?? true,
+    );
+  }
+
   /// Copie avec modifications
   UserModel copyWith({
     String? id,

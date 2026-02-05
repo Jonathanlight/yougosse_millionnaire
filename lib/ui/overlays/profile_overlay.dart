@@ -374,8 +374,8 @@ class _ProfileBottomSheetState extends State<ProfileBottomSheet> {
           ),
         ),
 
-        // Bouton Apple (iOS)
-        if (Platform.isIOS) ...[
+        // Bouton Apple (iOS/macOS)
+        if (Platform.isIOS || Platform.isMacOS) ...[
           const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,

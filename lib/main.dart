@@ -116,6 +116,7 @@ class _SplashScreenState extends State<SplashScreen>
   Future<void> _initializeApp() async {
     try {
       // Step 1: Initialize local services (fast, no network)
+      debugPrint('[Splash] Step 1: FirebaseInit.initializeLocal');
       setState(() {
         _loadingText = 'Initialisation...';
         _progress = 0.1;
@@ -123,6 +124,7 @@ class _SplashScreenState extends State<SplashScreen>
       await FirebaseInit.initializeLocal();
 
       // Step 2: Initialize save service (local)
+      debugPrint('[Splash] Step 2: saveService.initialize');
       setState(() {
         _loadingText = 'Chargement des données...';
         _progress = 0.3;
@@ -130,6 +132,7 @@ class _SplashScreenState extends State<SplashScreen>
       await saveService.initialize();
 
       // Step 3: Initialize audio and avatar services
+      debugPrint('[Splash] Step 3: audio + avatar services');
       setState(() {
         _loadingText = 'Chargement audio...';
         _progress = 0.5;
@@ -140,6 +143,7 @@ class _SplashScreenState extends State<SplashScreen>
       ]);
 
       // Step 4: Preload building images
+      debugPrint('[Splash] Step 4: BuildingComponent.loadBuildingImages');
       setState(() {
         _loadingText = 'Chargement des images...';
         _progress = 0.7;
@@ -147,6 +151,7 @@ class _SplashScreenState extends State<SplashScreen>
       await BuildingComponent.loadBuildingImages();
 
       // Step 5: Final preparation
+      debugPrint('[Splash] Step 5: Final preparation');
       setState(() {
         _loadingText = 'Préparation du jeu...';
         _progress = 0.9;
@@ -160,6 +165,7 @@ class _SplashScreenState extends State<SplashScreen>
       await Future.delayed(const Duration(milliseconds: 300));
 
       // Navigate directly to game
+      debugPrint('[Splash] Navigating to game');
       if (mounted) {
         _navigateToGame();
       }
@@ -167,7 +173,7 @@ class _SplashScreenState extends State<SplashScreen>
       // Initialize Firebase in background (non-blocking)
       FirebaseInit.initializeFirebaseInBackground();
     } catch (e) {
-      debugPrint('Error during initialization: $e');
+      debugPrint('[Splash] Error during initialization: $e');
       setState(() {
         _loadingText = 'Démarrage...';
       });
@@ -399,17 +405,26 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _initializeGame() async {
+    debugPrint('[GameScreen] _initializeGame started');
     GameState? loadedState;
 
     // If we have an initial state passed in, use it
     if (widget.initialState != null) {
+      debugPrint('[GameScreen] Using initial state');
       loadedState = widget.initialState;
     }
     // If we have a gameId and user is authenticated, try to load from cloud
     else if (_currentGameId != null && authService.isAuthenticated) {
+      debugPrint('[GameScreen] Loading from cloud for gameId: $_currentGameId');
       try {
         if (connectivityService.isOnline) {
-          final cloudResult = await cloudSaveService.loadGame(_currentGameId!);
+          final cloudResult = await cloudSaveService.loadGame(_currentGameId!).timeout(
+            const Duration(seconds: 5),
+            onTimeout: () {
+              debugPrint('[GameScreen] Cloud load timeout');
+              return CloudSaveResult.failure('Timeout');
+            },
+          );
           if (cloudResult.success && cloudResult.save != null) {
             loadedState = cloudResult.save!.toGameState();
           }
@@ -422,7 +437,10 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     }
 
     // Otherwise try local save service (legacy/guest mode)
+    debugPrint('[GameScreen] Loading from local save');
     loadedState ??= await saveService.loadGame();
+
+    debugPrint('[GameScreen] Local save loaded: ${loadedState != null}');
 
     if (loadedState != null) {
       _gameState = loadedState;
@@ -467,6 +485,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       onBuildingInfoRequested: _onBuildingInfoRequested,
     );
 
+    debugPrint('[GameScreen] Game initialized, setting _isLoading = false');
     setState(() {
       _isLoading = false;
     });

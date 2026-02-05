@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 
 /// Types of celebrations that can be triggered
 enum CelebrationType {
@@ -125,12 +126,25 @@ class CelebrationService extends ChangeNotifier {
 
     _currentCelebration = celebration;
     _isVisible = true;
-    notifyListeners();
+
+    // Schedule notification for next frame to avoid build conflicts
+    _safeNotifyListeners();
 
     // Start auto-dismiss timer
     _autoDismissTimer = Timer(celebration.displayDuration, () {
       _dismiss();
     });
+  }
+
+  /// Safely notify listeners by scheduling for next frame if needed
+  void _safeNotifyListeners() {
+    if (SchedulerBinding.instance.schedulerPhase == SchedulerPhase.idle) {
+      notifyListeners();
+    } else {
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        notifyListeners();
+      });
+    }
   }
 
   /// Trigger a celebration with custom message
@@ -165,7 +179,7 @@ class CelebrationService extends ChangeNotifier {
     if (_isVisible) {
       _isVisible = false;
       _currentCelebration = null;
-      notifyListeners();
+      _safeNotifyListeners();
     }
   }
 
