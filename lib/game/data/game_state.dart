@@ -43,6 +43,7 @@ class GameState extends ChangeNotifier {
 
   // Computed properties
   int get money => _player.money;
+  int get gems => _player.gems;
   int get level => _player.level;
   int get population => _city.totalPopulation;
   double get happiness => _city.happiness;
@@ -221,6 +222,21 @@ class GameState extends ChangeNotifier {
   void addXp(int amount) {
     _player.addXp(amount);
     notifyListeners();
+  }
+
+  /// Add gems directly
+  void addGems(int amount) {
+    _player.addGems(amount);
+    notifyListeners();
+  }
+
+  /// Try to spend gems
+  bool trySpendGems(int amount) {
+    final success = _player.trySpendGems(amount);
+    if (success) {
+      notifyListeners();
+    }
+    return success;
   }
 
   /// Remove a building

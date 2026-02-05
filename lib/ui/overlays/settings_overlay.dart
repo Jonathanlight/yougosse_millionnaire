@@ -330,20 +330,27 @@ class _StatsCard extends StatelessWidget {
                 children: [
                   Icon(stat.icon, color: Colors.grey, size: 20),
                   const SizedBox(width: 12),
-                  Text(
-                    stat.label,
-                    style: TextStyle(
-                      color: Colors.grey.shade400,
-                      fontSize: 14,
+                  Expanded(
+                    child: Text(
+                      stat.label,
+                      style: TextStyle(
+                        color: Colors.grey.shade400,
+                        fontSize: 14,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  const Spacer(),
-                  Text(
-                    stat.value,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(
+                      stat.value,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.end,
                     ),
                   ),
                 ],

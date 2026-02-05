@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "558527837591",
+    "project_id": "yougosse-millionaire",
+    "storage_bucket": "yougosse-millionaire.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:558527837591:android:a8aa043199221bd32740d2",
+        "android_client_info": {
+          "package_name": "com.yougossemillionaire.yougossemillionaire"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBhuRHbfvf9PXPBnoknsww9UKYLSswGmns"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

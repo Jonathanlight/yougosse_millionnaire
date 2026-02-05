@@ -2,7 +2,14 @@
   "permissions": {
     "allow": [
       "Bash(flutter analyze:*)",
-      "Bash(flutter pub get:*)"
+      "Bash(flutter pub get:*)",
+      "Bash(flutterfire configure:*)",
+      "Bash(dart pub global activate:*)",
+      "Bash($HOME/.pub-cache/bin/flutterfire configure:*)",
+      "Bash(curl:*)",
+      "Bash(bash)",
+      "Bash(firebase:*)",
+      "Bash(flutter build:*)"
     ]
   }
 }

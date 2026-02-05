@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../game/data/game_state.dart';
@@ -61,7 +62,18 @@ class _MonthlyObjectivesOverlayState extends State<MonthlyObjectivesOverlay>
       // Load saved progress or create new objectives
       final savedObjectives = prefs.getString('monthly_objectives_$_currentMonth');
       if (savedObjectives != null) {
-        // TODO: Parse saved objectives
+        try {
+          final Map<String, dynamic> savedJson =
+              Map<String, dynamic>.from(json.decode(savedObjectives) as Map);
+          _currentMonthObjectives = MonthlyObjectives.fromJson(savedJson);
+          _updateProgress();
+          setState(() {
+            _isLoading = false;
+          });
+          return;
+        } catch (e) {
+          // If parsing fails, create new objectives
+        }
       }
     } catch (e) {
       // SharedPreferences may fail - use default month 1
@@ -70,6 +82,7 @@ class _MonthlyObjectivesOverlayState extends State<MonthlyObjectivesOverlay>
 
     _initializeObjectives();
   }
+
 
   void _initializeObjectives() {
     try {
@@ -165,10 +178,15 @@ class _MonthlyObjectivesOverlayState extends State<MonthlyObjectivesOverlay>
   }
 
   Future<void> _saveProgress() async {
+    if (_currentMonthObjectives == null) return;
+
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt('current_objective_month', _currentMonth);
-      // TODO: Save detailed objective progress
+
+      // Save detailed objective progress
+      final objectivesJson = json.encode(_currentMonthObjectives!.toJson());
+      await prefs.setString('monthly_objectives_$_currentMonth', objectivesJson);
     } catch (e) {
       // Ignore save errors
     }
@@ -361,38 +379,47 @@ class _MonthlyObjectivesOverlayState extends State<MonthlyObjectivesOverlay>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Recompenses totales:',
-                style: TextStyle(
-                  color: Colors.grey.shade400,
-                  fontSize: 12,
+          Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Recompenses totales:',
+                  style: TextStyle(
+                    color: Colors.grey.shade400,
+                    fontSize: 12,
+                  ),
                 ),
-              ),
-              Text(
-                '${objectives.totalRewardMoney.toCurrency()} + ${objectives.totalRewardXp} XP',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
+                Text(
+                  '${objectives.totalRewardMoney.toCurrency()} + ${objectives.totalRewardXp} XP',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
+          const SizedBox(width: 8),
           if (claimable.isNotEmpty)
-            ElevatedButton(
-              onPressed: () {
-                for (final obj in claimable) {
-                  _claimReward(obj);
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                foregroundColor: Colors.white,
+            Flexible(
+              child: ElevatedButton(
+                onPressed: () {
+                  for (final obj in claimable) {
+                    _claimReward(obj);
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.green,
+                  foregroundColor: Colors.white,
+                ),
+                child: Text(
+                  'Reclamer tout (${claimable.length})',
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-              child: Text('Reclamer tout (${claimable.length})'),
             ),
         ],
       ),

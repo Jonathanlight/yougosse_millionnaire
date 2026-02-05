@@ -1,5 +1,4 @@
 import 'dart:math';
-import 'dart:ui';
 import 'package:flame/components.dart';
 import 'package:flutter/material.dart';
 import '../../services/weather_service.dart';
@@ -13,8 +12,8 @@ class WeatherEffectsComponent extends PositionComponent {
   final List<_Particle> _particles = [];
   final Random _random = Random();
 
-  static const int maxRainParticles = 200;
-  static const int maxSnowParticles = 150;
+  static const int maxRainParticles = 400;
+  static const int maxSnowParticles = 500;
 
   WeatherEffectsComponent({
     required this.weatherService,
@@ -50,11 +49,14 @@ class WeatherEffectsComponent extends PositionComponent {
   void _spawnRain() {
     final targetCount = (maxRainParticles * weatherService.weatherIntensity).round();
     while (_particles.length < targetCount) {
+      // Variety in rain drops - some heavy, some light
+      final isHeavyDrop = _random.nextDouble() < 0.3;
       _particles.add(_RainDrop(
         x: _random.nextDouble() * worldWidth,
-        y: -_random.nextDouble() * 100,
-        speed: 400 + _random.nextDouble() * 200,
-        length: 10 + _random.nextDouble() * 15,
+        y: -_random.nextDouble() * 150,
+        speed: isHeavyDrop ? 500 + _random.nextDouble() * 300 : 350 + _random.nextDouble() * 150,
+        length: isHeavyDrop ? 15 + _random.nextDouble() * 20 : 8 + _random.nextDouble() * 12,
+        thickness: isHeavyDrop ? 2.0 : 1.2,
       ));
     }
   }
@@ -62,13 +64,15 @@ class WeatherEffectsComponent extends PositionComponent {
   void _spawnSnow() {
     final targetCount = (maxSnowParticles * weatherService.weatherIntensity).round();
     while (_particles.length < targetCount) {
+      // More variety in snowflakes
+      final isLargeFlake = _random.nextDouble() < 0.2;
       _particles.add(_SnowFlake(
         x: _random.nextDouble() * worldWidth,
         y: -_random.nextDouble() * 100,
-        speed: 30 + _random.nextDouble() * 50,
-        size: 3 + _random.nextDouble() * 5,
-        wobbleSpeed: 1 + _random.nextDouble() * 2,
-        wobbleAmount: 20 + _random.nextDouble() * 30,
+        speed: isLargeFlake ? 20 + _random.nextDouble() * 30 : 40 + _random.nextDouble() * 60,
+        size: isLargeFlake ? 5 + _random.nextDouble() * 4 : 2 + _random.nextDouble() * 4,
+        wobbleSpeed: 0.5 + _random.nextDouble() * 2.5,
+        wobbleAmount: 15 + _random.nextDouble() * 40,
       ));
     }
   }
@@ -101,10 +105,22 @@ class WeatherEffectsComponent extends PositionComponent {
         break;
 
       case WeatherType.rain:
-        // Gray overlay for rain
+        // Dark gray overlay for rain atmosphere
         final paint = Paint()
-          ..color = Colors.blueGrey.withValues(alpha: 0.2);
+          ..color = Colors.blueGrey.withValues(alpha: 0.25);
         canvas.drawRect(rect, paint);
+        // Add darker clouds at top
+        final cloudPaint = Paint()
+          ..shader = LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Colors.grey.shade800.withValues(alpha: 0.3),
+              Colors.transparent,
+            ],
+            stops: const [0.0, 0.4],
+          ).createShader(rect);
+        canvas.drawRect(rect, cloudPaint);
         break;
 
       case WeatherType.cloudy:
@@ -115,10 +131,21 @@ class WeatherEffectsComponent extends PositionComponent {
         break;
 
       case WeatherType.snow:
-        // Slight white/blue tint
+        // White/blue tint for snowy atmosphere
         final paint = Paint()
-          ..color = Colors.lightBlue.withValues(alpha: 0.1);
+          ..color = Colors.lightBlue.withValues(alpha: 0.15);
         canvas.drawRect(rect, paint);
+        // Add fog effect at bottom for snow accumulation feel
+        final fogPaint = Paint()
+          ..shader = LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Colors.white.withValues(alpha: 0.0),
+              Colors.white.withValues(alpha: 0.1),
+            ],
+          ).createShader(Rect.fromLTWH(0, worldHeight * 0.7, worldWidth, worldHeight * 0.3));
+        canvas.drawRect(Rect.fromLTWH(0, worldHeight * 0.7, worldWidth, worldHeight * 0.3), fogPaint);
         break;
 
       case WeatherType.sunny:
@@ -166,32 +193,34 @@ abstract class _Particle {
 class _RainDrop extends _Particle {
   final double speed;
   final double length;
+  final double thickness;
 
   _RainDrop({
     required super.x,
     required super.y,
     required this.speed,
     required this.length,
+    this.thickness = 1.5,
   });
 
   @override
   bool update(double dt, double maxY) {
     y += speed * dt;
-    // Slight wind effect
-    x += 50 * dt;
+    // Wind effect varies with thickness
+    x += (30 + thickness * 15) * dt;
     return y < maxY;
   }
 
   @override
   void render(Canvas canvas) {
     final paint = Paint()
-      ..color = Colors.lightBlue.withValues(alpha: 0.6)
-      ..strokeWidth = 1.5
+      ..color = Colors.lightBlue.withValues(alpha: thickness > 1.5 ? 0.7 : 0.5)
+      ..strokeWidth = thickness
       ..strokeCap = StrokeCap.round;
 
     canvas.drawLine(
       Offset(x, y),
-      Offset(x + 2, y + length),
+      Offset(x + thickness, y + length),
       paint,
     );
   }

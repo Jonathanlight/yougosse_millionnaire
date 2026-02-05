@@ -23,10 +23,14 @@ class WeatherService extends ChangeNotifier {
   Timer? _timeTimer;
   bool _isNightTime = false;
 
+  // Temperature in degrees Celsius
+  int _temperature = 22;
+
   WeatherType get currentWeather => _currentWeather;
   double get weatherIntensity => _weatherIntensity;
   double get timeOfDay => _timeOfDay;
   bool get isNightTime => _isNightTime;
+  int get temperature => _temperature;
 
   /// Get ambient light level (0.0 = dark, 1.0 = bright)
   double get ambientLight {
@@ -98,19 +102,20 @@ class WeatherService extends ChangeNotifier {
     // Don't change weather at night (keep it as night)
     if (_isNightTime) {
       _currentWeather = WeatherType.night;
+      _updateTemperature();
       notifyListeners();
       return;
     }
 
     // Weather probabilities:
-    // Sunny: 40%, Cloudy: 25%, Rain: 25%, Snow: 10%
+    // Sunny: 40%, Cloudy: 25%, Rain: 20%, Snow: 15%
     final roll = _random.nextInt(100);
 
     if (roll < 40) {
       _currentWeather = WeatherType.sunny;
     } else if (roll < 65) {
       _currentWeather = WeatherType.cloudy;
-    } else if (roll < 90) {
+    } else if (roll < 85) {
       _currentWeather = WeatherType.rain;
     } else {
       _currentWeather = WeatherType.snow;
@@ -119,7 +124,32 @@ class WeatherService extends ChangeNotifier {
     // Random intensity
     _weatherIntensity = 0.3 + _random.nextDouble() * 0.7;
 
+    // Update temperature based on weather
+    _updateTemperature();
+
     notifyListeners();
+  }
+
+  void _updateTemperature() {
+    // Base temperature depends on weather type
+    switch (_currentWeather) {
+      case WeatherType.sunny:
+        _temperature = 25 + _random.nextInt(10); // 25-34
+        break;
+      case WeatherType.cloudy:
+        _temperature = 18 + _random.nextInt(8); // 18-25
+        break;
+      case WeatherType.rain:
+        _temperature = 12 + _random.nextInt(8); // 12-19
+        break;
+      case WeatherType.snow:
+        _temperature = -5 + _random.nextInt(8); // -5 to 2
+        break;
+      case WeatherType.night:
+        // Night is cooler
+        _temperature = 10 + _random.nextInt(10); // 10-19
+        break;
+    }
   }
 
   /// Force a specific weather (for testing or events)

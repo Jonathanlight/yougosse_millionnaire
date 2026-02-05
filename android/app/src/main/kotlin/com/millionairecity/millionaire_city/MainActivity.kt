@@ -1,4 +1,4 @@
-package com.millionairecity.millionaire_city
+package com.yougossemillionaire.yougossemillionaire
 
 import io.flutter.embedding.android.FlutterActivity
 

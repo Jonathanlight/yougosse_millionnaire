@@ -1,0 +1,129 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ==================== HELPER FUNCTIONS ====================
+
+    // Verifier si l'utilisateur est authentifie
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Verifier si l'utilisateur accede a ses propres donnees
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Verifier la taille des donnees
+    function isValidSize(data, maxSize) {
+      return data.size() <= maxSize;
+    }
+
+    // Verifier si un champ est un timestamp valide
+    function isValidTimestamp(field) {
+      return field is timestamp || field == request.time;
+    }
+
+    // Verifier les champs requis pour une partie
+    function hasRequiredGameFields(data) {
+      return data.keys().hasAll(['name', 'createdAt', 'updatedAt', 'lastPlayedAt', 'version', 'player', 'city', 'cityName']);
+    }
+
+    // Verifier les champs du joueur
+    function hasValidPlayerFields(player) {
+      return player.keys().hasAll(['money', 'xp'])
+          && player.money is int
+          && player.xp is int
+          && player.money >= 0
+          && player.xp >= 0;
+    }
+
+    // ==================== USERS COLLECTION ====================
+
+    match /users/{userId} {
+      // Lecture: seulement son propre profil
+      allow read: if isOwner(userId);
+
+      // Creation: seulement pour soi-meme
+      allow create: if isOwner(userId)
+          && request.resource.data.keys().hasAll(['createdAt', 'lastLoginAt'])
+          && request.resource.data.totalGamesCreated is int
+          && request.resource.data.totalGamesCreated >= 0;
+
+      // Mise a jour: seulement son propre profil, certains champs
+      allow update: if isOwner(userId)
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['id', 'createdAt']))
+          && request.resource.data.totalGamesCreated is int
+          && request.resource.data.totalGamesCreated >= 0;
+
+      // Suppression: seulement son propre profil
+      allow delete: if isOwner(userId);
+
+      // ==================== GAMES SUB-COLLECTION ====================
+
+      match /games/{gameId} {
+        // Limite de parties par utilisateur
+        function underGameLimit() {
+          return get(/databases/$(database)/documents/users/$(userId)).data.totalGamesCreated < 10;
+        }
+
+        // Lecture: seulement ses propres parties
+        allow read: if isOwner(userId);
+
+        // Creation: seulement ses propres parties, avec limite
+        allow create: if isOwner(userId)
+            && underGameLimit()
+            && hasRequiredGameFields(request.resource.data)
+            && hasValidPlayerFields(request.resource.data.player)
+            && request.resource.data.name is string
+            && request.resource.data.name.size() > 0
+            && request.resource.data.name.size() <= 50
+            && request.resource.data.version is string;
+
+        // Mise a jour: seulement ses propres parties
+        allow update: if isOwner(userId)
+            && hasValidPlayerFields(request.resource.data.player)
+            // Empecher modification de createdAt
+            && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['createdAt']))
+            // Anti-rollback: syncTimestamp doit augmenter
+            && request.resource.data.syncTimestamp >= resource.data.syncTimestamp;
+
+        // Suppression: seulement ses propres parties
+        allow delete: if isOwner(userId);
+      }
+    }
+
+    // ==================== LEADERBOARDS (optionnel) ====================
+
+    match /leaderboards/{category} {
+      // Lecture publique
+      allow read: if true;
+
+      // Ecriture interdite (geree par Cloud Functions)
+      allow write: if false;
+
+      match /entries/{entryId} {
+        allow read: if true;
+        allow write: if false;
+      }
+    }
+
+    // ==================== APP CONFIG (optionnel) ====================
+
+    match /config/{docId} {
+      // Lecture publique pour la config de l'app
+      allow read: if true;
+
+      // Ecriture interdite (admin seulement via console)
+      allow write: if false;
+    }
+
+    // ==================== DENY ALL OTHER ====================
+
+    // Bloquer tout autre acces par defaut
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

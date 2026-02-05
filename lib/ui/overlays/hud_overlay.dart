@@ -12,6 +12,7 @@ class HudOverlay extends StatefulWidget {
   final VoidCallback onBuildMenuPressed;
   final VoidCallback onSettingsPressed;
   final VoidCallback onCollectAllPressed;
+  final VoidCallback? onShopPressed;
 
   const HudOverlay({
     super.key,
@@ -20,6 +21,7 @@ class HudOverlay extends StatefulWidget {
     required this.onBuildMenuPressed,
     required this.onSettingsPressed,
     required this.onCollectAllPressed,
+    this.onShopPressed,
   });
 
   @override
@@ -44,7 +46,11 @@ class _HudOverlayState extends State<HudOverlay> {
 
   void _onGameStateChanged() {
     if (mounted) {
-      setState(() {});
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() {});
+        }
+      });
     }
   }
 
@@ -223,7 +229,7 @@ class _HudOverlayState extends State<HudOverlay> {
           ),
         ),
 
-        // Sound toggle button (top right)
+        // Sound toggle button (top left)
         Positioned(
           top: 130,
           left: 16,
@@ -236,7 +242,84 @@ class _HudOverlayState extends State<HudOverlay> {
                 : Colors.red.withValues(alpha: 0.7),
           ),
         ),
+
+        // Shop button (top left, below sound)
+        if (widget.onShopPressed != null)
+          Positioned(
+            top: 185,
+            left: 16,
+            child: _ShopButton(
+              gems: widget.gameState.gems,
+              onPressed: widget.onShopPressed!,
+            ),
+          ),
       ],
+    );
+  }
+}
+
+/// Shop button with gems display
+class _ShopButton extends StatelessWidget {
+  final int gems;
+  final VoidCallback onPressed;
+
+  const _ShopButton({
+    required this.gems,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onPressed,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Colors.amber.shade700,
+              Colors.orange.shade800,
+            ],
+          ),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: Colors.amber.withValues(alpha: 0.5),
+            width: 2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.amber.withValues(alpha: 0.3),
+              blurRadius: 8,
+              spreadRadius: 1,
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(
+              Icons.store,
+              color: Colors.white,
+              size: 18,
+            ),
+            const SizedBox(width: 6),
+            const Icon(
+              Icons.diamond,
+              color: Colors.cyan,
+              size: 14,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              '$gems',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -37,13 +37,27 @@ class WeatherOverlay extends StatelessWidget {
             children: [
               _getWeatherIcon(),
               const SizedBox(width: 8),
-              Text(
-                _getWeatherText(),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _getWeatherText(),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text(
+                    '${weatherService.temperature}°C',
+                    style: TextStyle(
+                      color: _getTemperatureColor(),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -125,6 +139,21 @@ class WeatherOverlay extends StatelessWidget {
         return Colors.lightBlue;
       case WeatherType.cloudy:
         return Colors.grey;
+    }
+  }
+
+  Color _getTemperatureColor() {
+    final temp = weatherService.temperature;
+    if (temp <= 0) {
+      return Colors.lightBlue.shade200; // Freezing
+    } else if (temp <= 10) {
+      return Colors.cyan.shade200; // Cold
+    } else if (temp <= 20) {
+      return Colors.green.shade200; // Cool
+    } else if (temp <= 28) {
+      return Colors.yellow.shade200; // Warm
+    } else {
+      return Colors.orange.shade200; // Hot
     }
   }
 }

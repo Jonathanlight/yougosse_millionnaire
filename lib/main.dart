@@ -8,8 +8,14 @@ import 'game/components/building.dart';
 import 'game/data/game_state.dart';
 import 'models/building_model.dart';
 import 'services/audio_service.dart';
+import 'services/auth_service.dart';
+import 'services/cloud_save_service.dart';
+import 'services/connectivity_service.dart';
+import 'services/firebase_init.dart';
+import 'services/migration_service.dart';
 import 'services/objectives_service.dart';
 import 'services/save_service.dart';
+import 'services/sync_service.dart';
 import 'services/weather_service.dart';
 import 'ui/overlays/build_menu.dart';
 import 'ui/overlays/building_info.dart';
@@ -19,7 +25,10 @@ import 'ui/overlays/hud_overlay.dart';
 import 'ui/overlays/monthly_objectives_overlay.dart';
 import 'ui/overlays/objectives_overlay.dart';
 import 'ui/overlays/settings_overlay.dart';
+import 'ui/overlays/shop_overlay.dart';
 import 'ui/overlays/weather_overlay.dart';
+import 'ui/screens/auth_screen.dart';
+import 'ui/screens/game_select_screen.dart';
 import 'utils/constants.dart';
 
 void main() async {
@@ -66,7 +75,7 @@ class MillionaireCityApp extends StatelessWidget {
   }
 }
 
-/// Splash screen with logo colors
+/// Splash screen with logo colors and Firebase initialization
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -105,28 +114,35 @@ class _SplashScreenState extends State<SplashScreen>
 
   Future<void> _initializeApp() async {
     try {
-      // Step 1: Initialize save service
+      // Step 1: Initialize Firebase and cloud services
+      setState(() {
+        _loadingText = 'Connexion aux services...';
+        _progress = 0.1;
+      });
+      await FirebaseInit.initialize();
+
+      // Step 2: Initialize save service (local)
       setState(() {
         _loadingText = 'Chargement des données...';
-        _progress = 0.2;
+        _progress = 0.3;
       });
       await saveService.initialize();
 
-      // Step 2: Initialize audio service
+      // Step 3: Initialize audio service
       setState(() {
         _loadingText = 'Chargement audio...';
-        _progress = 0.4;
+        _progress = 0.5;
       });
       await audioService.initialize();
 
-      // Step 3: Preload building images
+      // Step 4: Preload building images
       setState(() {
         _loadingText = 'Chargement des images...';
-        _progress = 0.6;
+        _progress = 0.7;
       });
       await BuildingComponent.loadBuildingImages();
 
-      // Step 4: Final preparation
+      // Step 5: Final preparation
       setState(() {
         _loadingText = 'Préparation du jeu...';
         _progress = 0.9;
@@ -137,28 +153,63 @@ class _SplashScreenState extends State<SplashScreen>
         _loadingText = 'Prêt!';
         _progress = 1.0;
       });
-      await Future.delayed(const Duration(milliseconds: 5000));
+      await Future.delayed(const Duration(milliseconds: 500));
 
-      // Navigate to game
+      // Navigate based on auth state
       if (mounted) {
-        Navigator.of(context).pushReplacement(
-          PageRouteBuilder(
-            pageBuilder: (context, animation, secondaryAnimation) =>
-                const GameScreen(),
-            transitionsBuilder:
-                (context, animation, secondaryAnimation, child) {
-              return FadeTransition(opacity: animation, child: child);
-            },
-            transitionDuration: const Duration(milliseconds: 500),
-          ),
-        );
+        _navigateToNextScreen();
       }
     } catch (e) {
-      print('Error during initialization: $e');
+      debugPrint('Error during initialization: $e');
       setState(() {
         _loadingText = 'Erreur de chargement';
       });
+      // Even on error, try to continue to auth screen
+      await Future.delayed(const Duration(seconds: 2));
+      if (mounted) {
+        _navigateToNextScreen();
+      }
     }
+  }
+
+  void _navigateToNextScreen() {
+    Widget nextScreen;
+
+    if (authService.isAuthenticated) {
+      // User is already logged in, go to game selection
+      nextScreen = GameSelectScreen(
+        onGameSelected: (gameId) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => GameScreen(gameId: gameId),
+            ),
+          );
+        },
+        onNewGame: () async {
+          // Create new game dialog will be handled in GameSelectScreen
+        },
+        onLogout: () {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => const AuthWrapper(),
+            ),
+          );
+        },
+      );
+    } else {
+      // User needs to login
+      nextScreen = const AuthWrapper();
+    }
+
+    Navigator.of(context).pushReplacement(
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) => nextScreen,
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return FadeTransition(opacity: animation, child: child);
+        },
+        transitionDuration: const Duration(milliseconds: 500),
+      ),
+    );
   }
 
   @override
@@ -305,8 +356,119 @@ class _SplashScreenState extends State<SplashScreen>
   }
 }
 
+/// Wrapper for authentication flow
+class AuthWrapper extends StatelessWidget {
+  const AuthWrapper({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return AuthScreen(
+      onAuthSuccess: () async {
+        // Check for migration
+        if (await migrationService.needsMigration()) {
+          // Show migration progress
+          if (context.mounted) {
+            showDialog(
+              context: context,
+              barrierDismissible: false,
+              builder: (_) => const _MigrationDialog(),
+            );
+          }
+
+          final result = await migrationService.migrate();
+
+          if (context.mounted) {
+            Navigator.of(context).pop(); // Close migration dialog
+
+            if (result.success && result.migratedGameId != null) {
+              // Go directly to the migrated game
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                  builder: (_) => GameScreen(gameId: result.migratedGameId),
+                ),
+              );
+              return;
+            }
+          }
+        }
+
+        // Go to game selection
+        if (context.mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => GameSelectScreen(
+                onGameSelected: (gameId) {
+                  Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(
+                      builder: (_) => GameScreen(gameId: gameId),
+                    ),
+                  );
+                },
+                onNewGame: () {},
+                onLogout: () {
+                  Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(
+                      builder: (_) => const AuthWrapper(),
+                    ),
+                  );
+                },
+              ),
+            ),
+          );
+        }
+      },
+      onSkip: () async {
+        // Guest mode - continue with local save only
+        if (context.mounted) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => const GameScreen(),
+            ),
+          );
+        }
+      },
+    );
+  }
+}
+
+/// Migration progress dialog
+class _MigrationDialog extends StatelessWidget {
+  const _MigrationDialog();
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: Colors.grey.shade900,
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const CircularProgressIndicator(),
+          const SizedBox(height: 16),
+          const Text(
+            'Migration des données...',
+            style: TextStyle(color: Colors.white),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Vos sauvegardes locales sont transférées vers le cloud',
+            style: TextStyle(color: Colors.grey.shade400, fontSize: 12),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class GameScreen extends StatefulWidget {
-  const GameScreen({super.key});
+  final String? gameId;
+  final GameState? initialState;
+
+  const GameScreen({
+    super.key,
+    this.gameId,
+    this.initialState,
+  });
 
   @override
   State<GameScreen> createState() => _GameScreenState();
@@ -318,6 +480,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   late WeatherService _weatherService;
   late ObjectivesService _objectivesService;
 
+  String? _currentGameId;
   bool _isLoading = true;
   bool _showBuildMenu = false;
   bool _showSettings = false;
@@ -325,6 +488,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   bool _showGameRules = false;
   bool _showDailyGreeting = false;
   bool _showMonthlyObjectives = false;
+  bool _showShop = false;
   BuildingModel? _selectedBuilding;
 
   @override
@@ -333,6 +497,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     _weatherService = WeatherService();
     _objectivesService = ObjectivesService();
+    _currentGameId = widget.gameId;
     _initializeGame();
   }
 
@@ -357,18 +522,38 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
   }
 
   Future<void> _initializeGame() async {
-    // Try to load existing save
-    final savedState = await saveService.loadGame();
+    GameState? loadedState;
 
-    if (savedState != null) {
-      _gameState = savedState;
+    // If we have an initial state passed in, use it
+    if (widget.initialState != null) {
+      loadedState = widget.initialState;
+    }
+    // If we have a gameId, try to load from cloud first, then local
+    else if (_currentGameId != null && authService.isAuthenticated) {
+      // Try cloud first
+      if (connectivityService.isOnline) {
+        final cloudResult = await cloudSaveService.loadGame(_currentGameId!);
+        if (cloudResult.success && cloudResult.save != null) {
+          loadedState = cloudResult.save!.toGameState();
+        }
+      }
+      // Fallback to local cache
+      loadedState ??= await syncService.loadGameFromCache(_currentGameId!);
+    }
+    // Otherwise try local save service (legacy/guest mode)
+    else {
+      loadedState = await saveService.loadGame();
+    }
+
+    if (loadedState != null) {
+      _gameState = loadedState;
 
       // Process daily credit payments (if any)
       final creditDeducted = _gameState.processCreditPayment();
       if (creditDeducted > 0) {
         // Show credit payment notification after build
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          _showCreditPaymentDialog(creditDeducted);
+          if (mounted) _showCreditPaymentDialog(creditDeducted);
         });
       }
 
@@ -377,7 +562,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
       if (offlineEarnings > 0) {
         // Show offline earnings dialog after build
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          _showOfflineEarningsDialog(offlineEarnings);
+          if (mounted) _showOfflineEarningsDialog(offlineEarnings);
         });
       }
     } else {
@@ -388,7 +573,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     _weatherService.initialize();
 
     // Initialize objectives service
-    _objectivesService.initialize(null); // TODO: Load from save
+    _objectivesService.initialize(null);
 
     // Update objectives with current game state
     _updateObjectivesProgress();
@@ -435,7 +620,18 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
   void _saveGame() {
     _gameState.updateSessionTime();
+
+    // Save locally first (always)
     saveService.saveGame(_gameState);
+
+    // If authenticated and has a game ID, also sync to cloud
+    if (authService.isAuthenticated && _currentGameId != null) {
+      syncService.saveLocally(
+        gameId: _currentGameId!,
+        name: _gameState.cityName,
+        gameState: _gameState,
+      );
+    }
   }
 
   void _onBuildingInfoRequested(BuildingModel building) {
@@ -674,6 +870,30 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     _initializeGame();
   }
 
+  void _goToGameSelect() {
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => GameSelectScreen(
+          onGameSelected: (gameId) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (_) => GameScreen(gameId: gameId),
+              ),
+            );
+          },
+          onNewGame: () {},
+          onLogout: () {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (_) => const AuthWrapper(),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -721,6 +941,11 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
               });
             },
             onCollectAllPressed: _collectAllRevenue,
+            onShopPressed: () {
+              setState(() {
+                _showShop = true;
+              });
+            },
           ),
 
           // Weather indicator (top center)
@@ -734,6 +959,17 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
               ),
             ),
           ),
+
+          // Sync status indicator (if authenticated)
+          if (authService.isAuthenticated)
+            Positioned(
+              top: 130,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: _SyncStatusIndicator(),
+              ),
+            ),
 
           // Objectives envelope button (top right)
           Positioned(
@@ -774,6 +1010,14 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
               },
             ),
           ),
+
+          // Back to game select button (if authenticated)
+          if (authService.isAuthenticated)
+            Positioned(
+              top: 355,
+              right: 16,
+              child: _GameSelectButton(onTap: _goToGameSelect),
+            ),
 
           // Game rules overlay
           if (_showGameRules)
@@ -853,6 +1097,23 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
               },
             ),
 
+          // Shop overlay
+          if (_showShop)
+            ShopOverlay(
+              gameState: _gameState,
+              onClose: () {
+                if (mounted) {
+                  setState(() {
+                    _showShop = false;
+                  });
+                }
+              },
+              onPackPurchased: (pack) {
+                // Award gems as bonus for purchasing (demo mode)
+                _gameState.addGems(10);
+              },
+            ),
+
           // NPC message button (animated icon, auto-hides after 5s)
           Positioned(
             bottom: 150,
@@ -869,6 +1130,88 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Sync status indicator widget
+class _SyncStatusIndicator extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: syncService,
+      builder: (context, _) {
+        final status = syncService.status;
+        final pending = syncService.pendingCount;
+
+        IconData icon;
+        Color color;
+        String? tooltip;
+
+        switch (status) {
+          case SyncStatus.syncing:
+            icon = Icons.sync;
+            color = Colors.blue;
+            tooltip = 'Synchronisation...';
+            break;
+          case SyncStatus.error:
+            icon = Icons.sync_problem;
+            color = Colors.orange;
+            tooltip = syncService.lastError ?? 'Erreur de sync';
+            break;
+          case SyncStatus.offline:
+            icon = Icons.cloud_off;
+            color = Colors.grey;
+            tooltip = 'Hors ligne';
+            break;
+          case SyncStatus.success:
+          case SyncStatus.idle:
+            if (pending > 0) {
+              icon = Icons.cloud_upload;
+              color = Colors.amber;
+              tooltip = '$pending en attente';
+            } else {
+              icon = Icons.cloud_done;
+              color = Colors.green;
+              tooltip = 'Synchronisé';
+            }
+            break;
+        }
+
+        return Tooltip(
+          message: tooltip ?? '',
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.black54,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (status == SyncStatus.syncing)
+                  SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: color,
+                    ),
+                  )
+                else
+                  Icon(icon, size: 14, color: color),
+                if (pending > 0) ...[
+                  const SizedBox(width: 4),
+                  Text(
+                    '$pending',
+                    style: TextStyle(color: color, fontSize: 10),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -903,6 +1246,44 @@ class _MonthlyObjectivesButton extends StatelessWidget {
         ),
         child: const Icon(
           Icons.calendar_month,
+          color: Colors.white,
+          size: 22,
+        ),
+      ),
+    );
+  }
+}
+
+/// Button to go back to game selection
+class _GameSelectButton extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _GameSelectButton({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: Colors.blue.withValues(alpha: 0.8),
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.3),
+            width: 2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.blue.withValues(alpha: 0.4),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: const Icon(
+          Icons.grid_view,
           color: Colors.white,
           size: 22,
         ),

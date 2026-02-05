@@ -3,6 +3,7 @@ import '../utils/constants.dart';
 /// Represents the player's progress and resources
 class PlayerModel {
   int money;
+  int gems;
   int xp;
   int totalMoneyEarned;
   int buildingsPlaced;
@@ -20,6 +21,7 @@ class PlayerModel {
 
   PlayerModel({
     this.money = GameConstants.startingMoney,
+    this.gems = 50, // Start with 50 gems
     this.xp = 0,
     this.totalMoneyEarned = 0,
     this.buildingsPlaced = 0,
@@ -106,6 +108,25 @@ class PlayerModel {
     xp += amount;
   }
 
+  /// Add gems to player
+  void addGems(int amount) {
+    gems += amount;
+  }
+
+  /// Try to spend gems, returns true if successful
+  bool trySpendGems(int amount) {
+    if (gems >= amount) {
+      gems -= amount;
+      return true;
+    }
+    return false;
+  }
+
+  /// Check if player can afford gems amount
+  bool canAffordGems(int amount) {
+    return gems >= amount;
+  }
+
   /// Update last session time
   void updateSessionTime() {
     lastSessionTime = DateTime.now();
@@ -180,6 +201,7 @@ class PlayerModel {
   /// Create a copy with updated fields
   PlayerModel copyWith({
     int? money,
+    int? gems,
     int? xp,
     int? totalMoneyEarned,
     int? buildingsPlaced,
@@ -193,6 +215,7 @@ class PlayerModel {
   }) {
     return PlayerModel(
       money: money ?? this.money,
+      gems: gems ?? this.gems,
       xp: xp ?? this.xp,
       totalMoneyEarned: totalMoneyEarned ?? this.totalMoneyEarned,
       buildingsPlaced: buildingsPlaced ?? this.buildingsPlaced,
@@ -210,6 +233,7 @@ class PlayerModel {
   Map<String, dynamic> toJson() {
     return {
       'money': money,
+      'gems': gems,
       'xp': xp,
       'totalMoneyEarned': totalMoneyEarned,
       'buildingsPlaced': buildingsPlaced,
@@ -227,6 +251,7 @@ class PlayerModel {
   factory PlayerModel.fromJson(Map<String, dynamic> json) {
     final player = PlayerModel(
       money: json['money'] as int? ?? GameConstants.startingMoney,
+      gems: json['gems'] as int? ?? 50,
       xp: json['xp'] as int? ?? 0,
       totalMoneyEarned: json['totalMoneyEarned'] as int? ?? 0,
       buildingsPlaced: json['buildingsPlaced'] as int? ?? 0,
@@ -252,6 +277,6 @@ class PlayerModel {
 
   @override
   String toString() {
-    return 'PlayerModel(money: $money, level: $level, xp: $xp)';
+    return 'PlayerModel(money: $money, gems: $gems, level: $level, xp: $xp)';
   }
 }
