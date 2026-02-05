@@ -9,25 +9,26 @@ import 'game/data/game_state.dart';
 import 'models/building_model.dart';
 import 'services/audio_service.dart';
 import 'services/auth_service.dart';
+import 'services/avatar_service.dart';
 import 'services/cloud_save_service.dart';
 import 'services/connectivity_service.dart';
 import 'services/firebase_init.dart';
-import 'services/migration_service.dart';
 import 'services/objectives_service.dart';
 import 'services/save_service.dart';
 import 'services/sync_service.dart';
 import 'services/weather_service.dart';
 import 'ui/overlays/build_menu.dart';
 import 'ui/overlays/building_info.dart';
+import 'ui/overlays/celebration_overlay.dart';
 import 'ui/overlays/daily_greeting_dialog.dart';
 import 'ui/overlays/game_rules_overlay.dart';
 import 'ui/overlays/hud_overlay.dart';
 import 'ui/overlays/monthly_objectives_overlay.dart';
 import 'ui/overlays/objectives_overlay.dart';
+import 'ui/overlays/profile_overlay.dart';
 import 'ui/overlays/settings_overlay.dart';
 import 'ui/overlays/shop_overlay.dart';
 import 'ui/overlays/weather_overlay.dart';
-import 'ui/screens/auth_screen.dart';
 import 'ui/screens/game_select_screen.dart';
 import 'utils/constants.dart';
 
@@ -114,12 +115,12 @@ class _SplashScreenState extends State<SplashScreen>
 
   Future<void> _initializeApp() async {
     try {
-      // Step 1: Initialize Firebase and cloud services
+      // Step 1: Initialize local services (fast, no network)
       setState(() {
-        _loadingText = 'Connexion aux services...';
+        _loadingText = 'Initialisation...';
         _progress = 0.1;
       });
-      await FirebaseInit.initialize();
+      await FirebaseInit.initializeLocal();
 
       // Step 2: Initialize save service (local)
       setState(() {
@@ -128,12 +129,15 @@ class _SplashScreenState extends State<SplashScreen>
       });
       await saveService.initialize();
 
-      // Step 3: Initialize audio service
+      // Step 3: Initialize audio and avatar services
       setState(() {
         _loadingText = 'Chargement audio...';
         _progress = 0.5;
       });
-      await audioService.initialize();
+      await Future.wait([
+        audioService.initialize(),
+        avatarService.initialize(),
+      ]);
 
       // Step 4: Preload building images
       setState(() {
@@ -147,63 +151,40 @@ class _SplashScreenState extends State<SplashScreen>
         _loadingText = 'Préparation du jeu...';
         _progress = 0.9;
       });
-      await Future.delayed(const Duration(milliseconds: 500));
+      await Future.delayed(const Duration(milliseconds: 300));
 
       setState(() {
         _loadingText = 'Prêt!';
         _progress = 1.0;
       });
-      await Future.delayed(const Duration(milliseconds: 500));
+      await Future.delayed(const Duration(milliseconds: 300));
 
-      // Navigate based on auth state
+      // Navigate directly to game
       if (mounted) {
-        _navigateToNextScreen();
+        _navigateToGame();
       }
+
+      // Initialize Firebase in background (non-blocking)
+      FirebaseInit.initializeFirebaseInBackground();
     } catch (e) {
       debugPrint('Error during initialization: $e');
       setState(() {
-        _loadingText = 'Erreur de chargement';
+        _loadingText = 'Démarrage...';
       });
-      // Even on error, try to continue to auth screen
-      await Future.delayed(const Duration(seconds: 2));
+      // Even on error, continue to game
+      await Future.delayed(const Duration(seconds: 1));
       if (mounted) {
-        _navigateToNextScreen();
+        _navigateToGame();
       }
     }
   }
 
-  void _navigateToNextScreen() {
-    Widget nextScreen;
-
-    if (authService.isAuthenticated) {
-      // User is already logged in, go to game selection
-      nextScreen = GameSelectScreen(
-        onGameSelected: (gameId) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(
-              builder: (_) => GameScreen(gameId: gameId),
-            ),
-          );
-        },
-        onNewGame: () async {
-          // Create new game dialog will be handled in GameSelectScreen
-        },
-        onLogout: () {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(
-              builder: (_) => const AuthWrapper(),
-            ),
-          );
-        },
-      );
-    } else {
-      // User needs to login
-      nextScreen = const AuthWrapper();
-    }
-
+  void _navigateToGame() {
+    // Always go directly to the game screen
     Navigator.of(context).pushReplacement(
       PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) => nextScreen,
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            const GameScreen(),
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           return FadeTransition(opacity: animation, child: child);
         },
@@ -356,110 +337,6 @@ class _SplashScreenState extends State<SplashScreen>
   }
 }
 
-/// Wrapper for authentication flow
-class AuthWrapper extends StatelessWidget {
-  const AuthWrapper({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return AuthScreen(
-      onAuthSuccess: () async {
-        // Check for migration
-        if (await migrationService.needsMigration()) {
-          // Show migration progress
-          if (context.mounted) {
-            showDialog(
-              context: context,
-              barrierDismissible: false,
-              builder: (_) => const _MigrationDialog(),
-            );
-          }
-
-          final result = await migrationService.migrate();
-
-          if (context.mounted) {
-            Navigator.of(context).pop(); // Close migration dialog
-
-            if (result.success && result.migratedGameId != null) {
-              // Go directly to the migrated game
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(
-                  builder: (_) => GameScreen(gameId: result.migratedGameId),
-                ),
-              );
-              return;
-            }
-          }
-        }
-
-        // Go to game selection
-        if (context.mounted) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(
-              builder: (_) => GameSelectScreen(
-                onGameSelected: (gameId) {
-                  Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(
-                      builder: (_) => GameScreen(gameId: gameId),
-                    ),
-                  );
-                },
-                onNewGame: () {},
-                onLogout: () {
-                  Navigator.of(context).pushReplacement(
-                    MaterialPageRoute(
-                      builder: (_) => const AuthWrapper(),
-                    ),
-                  );
-                },
-              ),
-            ),
-          );
-        }
-      },
-      onSkip: () async {
-        // Guest mode - continue with local save only
-        if (context.mounted) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(
-              builder: (_) => const GameScreen(),
-            ),
-          );
-        }
-      },
-    );
-  }
-}
-
-/// Migration progress dialog
-class _MigrationDialog extends StatelessWidget {
-  const _MigrationDialog();
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      backgroundColor: Colors.grey.shade900,
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const CircularProgressIndicator(),
-          const SizedBox(height: 16),
-          const Text(
-            'Migration des données...',
-            style: TextStyle(color: Colors.white),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Vos sauvegardes locales sont transférées vers le cloud',
-            style: TextStyle(color: Colors.grey.shade400, fontSize: 12),
-            textAlign: TextAlign.center,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class GameScreen extends StatefulWidget {
   final String? gameId;
   final GameState? initialState;
@@ -528,22 +405,24 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     if (widget.initialState != null) {
       loadedState = widget.initialState;
     }
-    // If we have a gameId, try to load from cloud first, then local
+    // If we have a gameId and user is authenticated, try to load from cloud
     else if (_currentGameId != null && authService.isAuthenticated) {
-      // Try cloud first
-      if (connectivityService.isOnline) {
-        final cloudResult = await cloudSaveService.loadGame(_currentGameId!);
-        if (cloudResult.success && cloudResult.save != null) {
-          loadedState = cloudResult.save!.toGameState();
+      try {
+        if (connectivityService.isOnline) {
+          final cloudResult = await cloudSaveService.loadGame(_currentGameId!);
+          if (cloudResult.success && cloudResult.save != null) {
+            loadedState = cloudResult.save!.toGameState();
+          }
         }
+        // Fallback to local cache
+        loadedState ??= await syncService.loadGameFromCache(_currentGameId!);
+      } catch (e) {
+        debugPrint('[GameScreen] Error loading cloud save: $e');
       }
-      // Fallback to local cache
-      loadedState ??= await syncService.loadGameFromCache(_currentGameId!);
     }
+
     // Otherwise try local save service (legacy/guest mode)
-    else {
-      loadedState = await saveService.loadGame();
-    }
+    loadedState ??= await saveService.loadGame();
 
     if (loadedState != null) {
       _gameState = loadedState;
@@ -883,15 +762,20 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
           },
           onNewGame: () {},
           onLogout: () {
+            authService.signOut();
             Navigator.of(context).pushReplacement(
               MaterialPageRoute(
-                builder: (_) => const AuthWrapper(),
+                builder: (_) => const GameScreen(),
               ),
             );
           },
         ),
       ),
     );
+  }
+
+  void _showProfile() {
+    showProfileBottomSheet(context);
   }
 
   @override
@@ -958,6 +842,13 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
                 weatherService: _weatherService,
               ),
             ),
+          ),
+
+          // Profile button (top left, under HUD)
+          Positioned(
+            top: 130,
+            left: 16,
+            child: ProfileButton(onTap: _showProfile),
           ),
 
           // Sync status indicator (if authenticated)
@@ -1128,6 +1019,9 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
               },
             ),
           ),
+
+          // Celebration overlay (on top of everything)
+          const CelebrationOverlay(),
         ],
       ),
     );

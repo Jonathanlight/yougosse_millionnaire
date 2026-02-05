@@ -2,7 +2,8 @@
 
 A Yougosse millionaire game where you can build and manage your city.
 
-ID: com.yougossemillionaire.yougossemillionaire
+### ID: com.yougossemillionaire.yougossemillionaire
+
 <table>
     <tr>
         <td> <img src="assets/screenshot/screen1.png" alt="screen1"> </td>

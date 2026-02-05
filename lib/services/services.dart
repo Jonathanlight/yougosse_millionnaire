@@ -3,6 +3,8 @@ library services;
 
 export 'audio_service.dart';
 export 'auth_service.dart';
+export 'avatar_service.dart';
+export 'celebration_service.dart';
 export 'cloud_save_service.dart';
 export 'connectivity_service.dart';
 export 'firebase_init.dart';

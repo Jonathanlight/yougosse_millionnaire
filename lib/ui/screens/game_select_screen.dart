@@ -502,7 +502,7 @@ class _GameSelectScreenState extends State<GameSelectScreen> {
               ),
             ),
             const Divider(),
-            if (authService.isAnonymous)
+            if (authService.isGuest)
               ListTile(
                 leading: const Icon(Icons.link),
                 title: const Text('Créer un compte'),

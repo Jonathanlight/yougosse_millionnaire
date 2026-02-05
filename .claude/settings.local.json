@@ -9,7 +9,14 @@
       "Bash(curl:*)",
       "Bash(bash)",
       "Bash(firebase:*)",
-      "Bash(flutter build:*)"
+      "Bash(flutter build:*)",
+      "Bash(ls:*)",
+      "Bash(./gradlew signingReport:*)",
+      "Bash(keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android:*)",
+      "Bash(keytool -list -v -keystore /Users/jonathan/.android/debug.keystore -alias androiddebugkey -storepass android:*)",
+      "Bash(keytool:*)",
+      "Bash(openssl sha1:*)",
+      "Bash(flutter clean:*)"
     ]
   }
 }
