@@ -9,6 +9,7 @@ import 'game/data/game_state.dart';
 import 'models/building_model.dart';
 import 'services/audio_service.dart';
 import 'services/auth_service.dart';
+import 'services/iap_service.dart';
 import 'services/avatar_service.dart';
 import 'services/cloud_save_service.dart';
 import 'services/connectivity_service.dart';
@@ -381,7 +382,33 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     _weatherService = WeatherService();
     _objectivesService = ObjectivesService();
     _currentGameId = widget.gameId;
+    _initializeIAP();
     _initializeGame();
+  }
+
+  void _initializeIAP() {
+    final iap = IAPService();
+    iap.initialize();
+    iap.onGemsPurchased = (productId, gems) {
+      if (mounted) {
+        setState(() {
+          _gameState.addGems(gems);
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.diamond, color: Colors.cyan),
+                const SizedBox(width: 12),
+                Text('$gems gemmes ajoutees!'),
+              ],
+            ),
+            backgroundColor: Colors.green.shade800,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    };
   }
 
   @override
@@ -390,6 +417,7 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
     _saveGame();
     _weatherService.dispose();
     _objectivesService.dispose();
+    IAPService().dispose();
     super.dispose();
   }
 

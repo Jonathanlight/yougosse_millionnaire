@@ -34,7 +34,9 @@
       "Bash(for icon in /Users/jonathan/Desktop/work/mobile/millionaire-city/ios/Runner/Assets.xcassets/AppIcon.appiconset/*.png)",
       "Bash(do sips -s format png --setProperty formatOptions 100 \"$icon\" --out \"$icon\")",
       "Bash(done)",
-      "Bash(do magick \"$icon\" -background white -alpha remove -alpha off \"$icon\")"
+      "Bash(do magick \"$icon\" -background white -alpha remove -alpha off \"$icon\")",
+      "Bash(find:*)",
+      "Bash(flutter pub:*)"
     ]
   }
 }

@@ -38,6 +38,7 @@ dependencies:
   collection: ^1.19.0
   shared_preferences: ^2.2.2
   crypto: ^3.0.6
+  in_app_purchase: ^3.2.3
 
 dev_dependencies:
   flutter_test:

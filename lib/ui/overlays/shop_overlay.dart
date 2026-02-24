@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../game/data/game_state.dart';
 import '../../models/shop_model.dart';
+import '../../services/iap_service.dart';
 import '../../utils/helpers.dart';
 
 /// Shop overlay for premium content
@@ -8,12 +9,14 @@ class ShopOverlay extends StatefulWidget {
   final GameState gameState;
   final VoidCallback onClose;
   final void Function(ShopPack pack) onPackPurchased;
+  final void Function(ShopOffer offer)? onGemOfferPurchased;
 
   const ShopOverlay({
     super.key,
     required this.gameState,
     required this.onClose,
     required this.onPackPurchased,
+    this.onGemOfferPurchased,
   });
 
   @override
@@ -390,13 +393,43 @@ class _ShopOverlayState extends State<ShopOverlay>
     );
   }
 
+  void _purchaseGemOffer(ShopOffer offer) async {
+    final iap = IAPService();
+    if (!iap.isAvailable) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Boutique non disponible. Réessayez plus tard.'),
+            backgroundColor: Colors.red.shade800,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+      return;
+    }
+
+    final success = await iap.buyGems(offer.id);
+    if (!success && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Impossible de lancer l\'achat.'),
+          backgroundColor: Colors.red.shade800,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
   Widget _buildGemsTab() {
     return ListView.builder(
       padding: const EdgeInsets.all(12),
       itemCount: ShopData.gemOffers.length,
       itemBuilder: (context, index) {
         final offer = ShopData.gemOffers[index];
-        return _GemOfferCard(offer: offer);
+        return _GemOfferCard(
+          offer: offer,
+          onPurchase: () => _purchaseGemOffer(offer),
+        );
       },
     );
   }
@@ -636,8 +669,9 @@ class _PackCard extends StatelessWidget {
 
 class _GemOfferCard extends StatelessWidget {
   final ShopOffer offer;
+  final VoidCallback onPurchase;
 
-  const _GemOfferCard({required this.offer});
+  const _GemOfferCard({required this.offer, required this.onPurchase});
 
   @override
   Widget build(BuildContext context) {
@@ -744,14 +778,7 @@ class _GemOfferCard extends StatelessWidget {
 
                 // Price
                 ElevatedButton(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Achats in-app non disponibles (demo)'),
-                        duration: Duration(seconds: 2),
-                      ),
-                    );
-                  },
+                  onPressed: onPurchase,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: offer.color,
                     foregroundColor: Colors.white,
@@ -762,7 +789,8 @@ class _GemOfferCard extends StatelessWidget {
                     ),
                   ),
                   child: Text(
-                    '${offer.priceEuros.toStringAsFixed(2)} EUR',
+                    IAPService().getPriceForOffer(offer.id) ??
+                        '${offer.priceEuros.toStringAsFixed(2)} EUR',
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ),
