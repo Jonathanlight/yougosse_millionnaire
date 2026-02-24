@@ -16,7 +16,25 @@
       "Bash(keytool -list -v -keystore /Users/jonathan/.android/debug.keystore -alias androiddebugkey -storepass android:*)",
       "Bash(keytool:*)",
       "Bash(openssl sha1:*)",
-      "Bash(flutter clean:*)"
+      "Bash(flutter clean:*)",
+      "Bash(git add:*)",
+      "Bash(git config:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(flutter doctor:*)",
+      "Bash(pod --version:*)",
+      "Bash(flutter pub outdated:*)",
+      "Bash(security find-identity:*)",
+      "Bash(security find-certificate:*)",
+      "Bash(openssl x509:*)",
+      "Bash(pod install:*)",
+      "Bash(open:*)",
+      "Bash(git tag:*)",
+      "Bash(sips:*)",
+      "Bash(for icon in /Users/jonathan/Desktop/work/mobile/millionaire-city/ios/Runner/Assets.xcassets/AppIcon.appiconset/*.png)",
+      "Bash(do sips -s format png --setProperty formatOptions 100 \"$icon\" --out \"$icon\")",
+      "Bash(done)",
+      "Bash(do magick \"$icon\" -background white -alpha remove -alpha off \"$icon\")"
     ]
   }
 }
