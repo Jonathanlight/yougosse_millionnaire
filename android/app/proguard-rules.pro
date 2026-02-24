@@ -18,6 +18,10 @@
 -keepattributes EnclosingMethod
 -keepattributes InnerClasses
 
+# In-App Purchase / Google Play Billing
+-keep class com.android.vending.billing.** { *; }
+-keep class com.google.android.gms.internal.play_billing.** { *; }
+
 # Play Core (deferred components)
 -dontwarn com.google.android.play.core.splitcompat.SplitCompatApplication
 -dontwarn com.google.android.play.core.splitinstall.SplitInstallException

@@ -36,7 +36,9 @@
       "Bash(done)",
       "Bash(do magick \"$icon\" -background white -alpha remove -alpha off \"$icon\")",
       "Bash(find:*)",
-      "Bash(flutter pub:*)"
+      "Bash(flutter pub:*)",
+      "Bash(java:*)",
+      "Bash(test:*)"
     ]
   }
 }
